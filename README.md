@@ -39,39 +39,51 @@ portfolio showcase targeting European tech companies.
 ## Quickstart
 
 ```bash
-# 1. Create and activate a virtual environment
+# 1. Create a virtual environment (a repo-local conda env is used for development, see below)
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+.venv\Scripts\activate            # Windows
+# source .venv/bin/activate       # macOS/Linux
 
 # 2. Install the package with dev extras
 pip install -e ".[dev]"
 
-# 3. Copy and adjust environment configuration
-cp .env.example .env
+# 3. Run the test suite
+python -m pytest
 
-# 4. Run the test suite
-pytest
-
-# 5. Start Qdrant (Docker) and the API
-docker compose up -d qdrant
-rag-api
+# 4. Start Qdrant (Docker) and the API
+docker compose -f docker/docker-compose.yml up -d qdrant
+python -m uvicorn rag_platform.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Core Commands
+The API works out of the box against a local Qdrant at `http://localhost:6333`.
+Copy `.env.example` to `.env` only to override any setting.
 
-```bash
-# Lint
-ruff check .
+## Development environment
 
-# Type check
-mypy src
+The project is developed on **Windows** with a **conda environment stored inside the
+repository** at `.conda/` (gitignored). Dev tools and the console scripts
+(`rag-api`, `rag-ingest`) are installed into `.conda\Scripts`, which is not on
+`PATH` by default, so local commands call the environment's interpreter explicitly:
 
-# Run the API (http://localhost:8000/docs)
-rag-api
+```powershell
+# Lint / type check / tests
+.conda\python.exe -m ruff check .
+.conda\python.exe -m mypy src
+.conda\python.exe -m pytest
+
+# Run the API (docs at http://localhost:8000/docs)
+.conda\python.exe -m uvicorn rag_platform.api.main:app --host 127.0.0.1 --port 8000
 
 # Batch-ingest local documents into the vector store
-rag-ingest ./data/sample
+.conda\python.exe -m rag_platform.ingestion.cli ./data/sample
+
+# Start / stop the vector DB (Docker)
+docker compose -f docker/docker-compose.yml up -d qdrant
+docker compose -f docker/docker-compose.yml down
 ```
+
+> If `.conda\Scripts` is added to `PATH`, the shorter `pytest`, `ruff`, `rag-api`
+> and `rag-ingest` commands also work.
 
 ## Environment Variables
 
