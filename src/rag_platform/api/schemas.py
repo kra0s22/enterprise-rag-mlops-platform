@@ -47,3 +47,30 @@ class SearchResponse(BaseModel):
 
     query: str
     hits: list[SearchHitResponse]
+
+
+class RagRequest(BaseModel):
+    """Payload for the grounded generation endpoint."""
+
+    query: str = Field(..., min_length=1, description="Natural-language question")
+    top_k: int = Field(default=5, ge=1, le=20, description="Number of context chunks to retrieve")
+    filters: dict[str, Any] = Field(
+        default_factory=dict, description="Exact-match payload filters"
+    )
+
+
+class RagSource(BaseModel):
+    """A context chunk used to ground the generated answer."""
+
+    id: str
+    score: float
+    chunk_text: str
+    metadata: dict[str, Any]
+
+
+class RagResponse(BaseModel):
+    """Result of a grounded generation request."""
+
+    query: str
+    answer: str
+    sources: list[RagSource]

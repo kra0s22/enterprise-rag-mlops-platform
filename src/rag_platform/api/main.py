@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from rag_platform.api.routes import ingest, search
+from rag_platform.api.routes import ingest, rag, search
 from rag_platform.config.settings import get_settings
 from rag_platform.utils.logging import configure_logging, get_logger
 
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(ingest.router)
     app.include_router(search.router)
+    app.include_router(rag.router)
 
     @app.get("/health", tags=["system"], summary="Liveness probe")
     def health() -> dict[str, str]:
