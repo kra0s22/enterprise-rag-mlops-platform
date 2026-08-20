@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     default_top_k: int = 5
     score_threshold: float = 0.0
 
+    # Generation (Ollama)
+    ollama_url: str = "http://localhost:11434"
+    llm_model: str = "llama3.2:3b"
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 512
+
     # MLflow
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment_name: str = "rag_platform"
