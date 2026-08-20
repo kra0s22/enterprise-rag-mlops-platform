@@ -33,6 +33,13 @@ def generate_answer(
 
     query_vector = embedder.embed_query(request.query)
     hits = store.search(query_vector, top_k=request.top_k, filters=request.filters)
+    if not hits:
+        logger.info("No context retrieved for query=%r; skipping generation", request.query)
+        return RagResponse(
+            query=request.query,
+            answer="No relevant information was found in the knowledge base for this question.",
+            sources=[],
+        )
     contexts = [str(hit.payload.get("chunk_text", "")) for hit in hits]
 
     answer = client.generate(request.query, contexts)
