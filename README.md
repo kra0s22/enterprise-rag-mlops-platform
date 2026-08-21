@@ -9,6 +9,7 @@ portfolio showcase targeting European tech companies.
 | ------------------- | --------------------------------------------------------------- |
 | Distributed ingestion| **PySpark** (distributed text processing & chunking)             |
 | Embeddings          | **SentenceTransformers** (local / OSS)                           |
+| Generation          | **Ollama** (`llama3.2:3b`) — grounded answers from retrieved context |
 | Vector Database     | **Qdrant** / **Milvus** (behind a common abstraction layer)      |
 | Serving API         | **FastAPI**                                                      |
 | Evaluation          | **Ragas** (faithfulness, answer relevancy, context precision/recall) |
@@ -27,6 +28,7 @@ portfolio showcase targeting European tech companies.
 │   ├── utils/                   # Logging helpers
 │   ├── ingestion/               # Loader, token chunker, PySpark pipeline, CLI
 │   ├── embeddings/              # SentenceTransformers provider
+│   ├── generation/              # Ollama grounded-generation client
 │   ├── vectorstore/             # VectorStore abstraction + Qdrant/Milvus backends
 │   ├── api/                     # FastAPI app (schemas, routes, dependencies)
 │   ├── evaluation/              # Ragas evaluation runner
@@ -85,6 +87,35 @@ docker compose -f docker/docker-compose.yml down
 > If `.conda\Scripts` is added to `PATH`, the shorter `pytest`, `ruff`, `rag-api`
 > and `rag-ingest` commands also work.
 
+## API Endpoints
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| `POST` | `/v1/ingest` | Chunk, embed, and store a document |
+| `POST` | `/v1/search` | Retrieve the top-k nearest chunks for a query |
+| `POST` | `/v1/rag` | Retrieve context and generate a grounded answer with Ollama |
+| `GET`  | `/health` | Liveness probe |
+
+### Grounded generation — `POST /v1/rag`
+
+Retrieves the top-k relevant chunks for the question, injects them into a strict
+*"answer only from context"* prompt, and calls a local **Ollama** model. Returns both
+the answer and the `sources` it is grounded on, making every claim auditable:
+
+```json
+{
+  "query": "how does qdrant store embeddings?",
+  "answer": "Qdrant stores embeddings as high-dimensional vectors...",
+  "sources": [
+    {"id": "chunk-uuid", "score": 0.85, "chunk_text": "...", "metadata": {"source": "vector-db-notes"}}
+  ]
+}
+```
+
+If no relevant context is retrieved (or every hit is below `RAG_SCORE_THRESHOLD`),
+the endpoint skips generation and returns a *"no relevant information"* response,
+avoiding hallucinated answers.
+
 ## Environment Variables
 
 All configuration is read from environment variables prefixed with `RAG_` (see `.env.example`).
@@ -94,6 +125,8 @@ Key variables:
 - `RAG_EMBEDDING_MODEL` — local SentenceTransformer model name
 - `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` — token chunking window
 - `RAG_QDRANT_URL` / `RAG_MILVUS_URI` — vector DB endpoints
+- `RAG_OLLAMA_URL` / `RAG_LLM_MODEL` — local Ollama endpoint and model for generation
+- `RAG_LLM_TEMPERATURE` / `RAG_LLM_MAX_TOKENS` — generation sampling controls
 - `RAG_MLFLOW_TRACKING_URI` — MLflow server endpoint
 
 ## Evaluation
