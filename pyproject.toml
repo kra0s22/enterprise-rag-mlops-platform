@@ -37,8 +37,11 @@ dependencies = [
 
 [project.optional-dependencies]
 # Heavy evaluation stack, kept out of the serving image to keep it lean.
+# ragas is pinned <0.3 and langchain-community <0.4: newer ragas versions import
+# langchain_community.chat_models.vertexai, which was removed in langchain-community 0.4.
 eval = [
-    "ragas>=0.2.0",
+    "ragas>=0.2.0,<0.3",
+    "langchain-community>=0.3.0,<0.4",
     "mlflow>=2.15.0",
 ]
 dev = [
@@ -49,7 +52,8 @@ dev = [
     "mypy>=1.10.0",
 ]
 all = [
-    "ragas>=0.2.0",
+    "ragas>=0.2.0,<0.3",
+    "langchain-community>=0.3.0,<0.4",
     "mlflow>=2.15.0",
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
