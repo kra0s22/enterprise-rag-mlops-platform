@@ -25,10 +25,12 @@ mlruns/
 mlartifacts/
 
 # Data & artifacts
-data/
+data/*
 artifacts/
 *.parquet
 *.jsonl
+# Keep the sample evaluation dataset versioned.
+!data/eval_set.jsonl
 
 # IDE
 .vscode/
@@ -44,3 +46,6 @@ Thumbs.db
 
 # Interview prep (personal, not versioned)
 INTERVIEW_PREP.md
+
+# Session plans (personal, not versioned)
+SESSION_PLAN.md
