@@ -33,6 +33,7 @@ def generate_answer(
 
     query_vector = embedder.embed_query(request.query)
     hits = store.search(query_vector, top_k=request.top_k, filters=request.filters)
+    hits = [hit for hit in hits if hit.score >= settings.score_threshold]
     if not hits:
         logger.info("No context retrieved for query=%r; skipping generation", request.query)
         return RagResponse(

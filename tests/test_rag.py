@@ -60,3 +60,24 @@ def test_rag_short_circuits_without_context(client, fake_generator) -> None:
 def test_rag_validates_query(client) -> None:
     response = client.post("/v1/rag", json={"query": ""})
     assert response.status_code == 422
+
+
+def test_rag_excludes_low_confidence_hits(client, fake_generator, store, monkeypatch) -> None:
+    from rag_platform.config.settings import get_settings
+    from rag_platform.vectorstore.base import SearchHit
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "score_threshold", 0.9)
+    monkeypatch.setattr(
+        store,
+        "search",
+        lambda *args, **kwargs: [
+            SearchHit(id="low-score", score=0.5, payload={"chunk_text": "irrelevant chunk"})
+        ],
+    )
+    response = client.post("/v1/rag", json={"query": "anything", "top_k": 3})
+    assert response.status_code == 200
+    body = response.json()
+    assert "No relevant information" in body["answer"]
+    assert body["sources"] == []
+    assert fake_generator.calls == []
