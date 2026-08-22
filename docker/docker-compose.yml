@@ -6,8 +6,9 @@ services:
       - "6334:6334"  # gRPC
     volumes:
       - qdrant_storage:/qdrant/storage
+    # The qdrant image ships without curl; probe the REST port with bash /dev/tcp.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -21,6 +22,9 @@ services:
       RAG_VECTOR_STORE_PROVIDER: qdrant
       RAG_QDRANT_URL: http://qdrant:6333
       RAG_EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+      RAG_OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:
