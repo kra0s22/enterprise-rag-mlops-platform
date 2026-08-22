@@ -99,6 +99,9 @@ def main() -> None:
     parser.add_argument(
         "--out", default=Path("data/eval_results.jsonl"), type=Path, help="Output JSONL path"
     )
+    parser.add_argument(
+        "--mlflow", action="store_true", help="Log experiment parameters and metrics to MLflow"
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -126,6 +129,22 @@ def main() -> None:
     for name, value in scores.items():
         label = "N/A" if math.isnan(value) else f"{value:.4f}"
         print(f"{name}: {label}")
+
+    if args.mlflow:
+        from rag_platform.mlflow_tracking.tracker import log_metrics, track_run
+
+        params = {
+            "llm_model": settings.llm_model,
+            "llm_temperature": settings.llm_temperature,
+            "embedding_model": settings.embedding_model,
+            "top_k": args.top_k,
+            "dataset": str(args.dataset),
+            "n_samples": len(samples),
+        }
+        metrics = {name: value for name, value in scores.items() if not math.isnan(value)}
+        with track_run(run_name=f"rag-eval-{settings.llm_model}", params=params):
+            log_metrics(metrics)
+        logger.info("Evaluation logged to MLflow with metrics: %s", metrics)
 
 
 if __name__ == "__main__":

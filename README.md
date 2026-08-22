@@ -135,8 +135,27 @@ The Ragas evaluation stack is isolated in the `eval` extra to keep the serving i
 
 ```bash
 pip install -e ".[eval]"
-python -m rag_platform.evaluation.ragas_eval --dataset ./data/eval_set.jsonl
 ```
+
+With the API and a vector store running (see `docker/docker-compose.yml`), the end-to-end
+runner queries `/v1/rag` for every question in the dataset, persists the collected samples,
+and scores them with Ragas using the self-hosted Ollama LLM:
+
+```bash
+python -m rag_platform.evaluation.run_evaluation \
+    --dataset ./data/eval_set.jsonl --api-url http://127.0.0.1:8000 --top-k 3
+```
+
+Append `--mlflow` to log the experiment parameters and metrics to the MLflow server
+(`RAG_MLFLOW_TRACKING_URI`, experiment `rag_platform`):
+
+```bash
+python -m rag_platform.evaluation.run_evaluation \
+    --dataset ./data/eval_set.jsonl --api-url http://127.0.0.1:8000 --top-k 3 --mlflow
+```
+
+The dataset is a JSONL file with `{question, ground_truth}`; the runner writes the collected
+answers and retrieved contexts to `data/eval_results.jsonl` for reproducibility.
 
 ## License
 
