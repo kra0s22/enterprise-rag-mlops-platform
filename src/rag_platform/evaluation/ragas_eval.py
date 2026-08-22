@@ -18,7 +18,10 @@ DEFAULT_METRICS = ["faithfulness", "answer_relevancy", "context_precision", "con
 
 
 def evaluate_rag(
-    dataset: list[dict[str, Any]], metrics: list[str] | None = None
+    dataset: list[dict[str, Any]],
+    metrics: list[str] | None = None,
+    llm: Any | None = None,
+    embeddings: Any | None = None,
 ) -> dict[str, float]:
     """Evaluate a RAG dataset with Ragas and return metric scores.
 
@@ -26,6 +29,9 @@ def evaluate_rag(
         dataset: List of samples with keys ``question``, ``answer``, ``contexts``
             (list of retrieved chunks) and optional ``ground_truth``.
         metrics: Metric names to compute; defaults to the four core metrics.
+        llm: Optional Ragas LLM wrapper; when omitted Ragas falls back to OpenAI.
+        embeddings: Optional Ragas embeddings; when omitted Ragas falls back to
+            OpenAI embeddings. Pass both to run fully self-hosted (e.g. Ollama).
 
     Returns:
         Mapping of metric name to score in [0, 1].
@@ -54,8 +60,14 @@ def evaluate_rag(
     if not chosen:
         raise ValueError(f"No valid metrics requested; supported: {list(metric_map)}")
 
-    result = evaluate(dataset=EvaluationDataset(samples=samples), metrics=chosen)
-    scores = {name: float(getattr(result, name)) for name in selected if name in metric_map}
+    result = evaluate(
+        dataset=EvaluationDataset(samples=samples),
+        metrics=chosen,
+        llm=llm,
+        embeddings=embeddings,
+    )
+    frame = result.to_pandas()
+    scores = {name: float(frame[name].mean()) for name in selected if name in metric_map}
     logger.info("Ragas evaluation completed: %s", scores)
     return scores
 
