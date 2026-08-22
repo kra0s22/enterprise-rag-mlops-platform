@@ -1,11 +1,17 @@
-"""Hermetic tests for the Ragas evaluation helpers and the evaluation runner."""
+"""Hermetic tests for the Ragas evaluation helpers and the evaluation runner.
+
+The module is skipped when ``ragas`` is not installed, so CI (which installs only
+the ``dev`` extra) stays green while local runs exercise the tests.
+"""
 
 from __future__ import annotations
 
-import ragas
+import pytest
 
 from rag_platform.evaluation import ragas_eval
 from rag_platform.evaluation.run_evaluation import collect_answers
+
+ragas = pytest.importorskip("ragas")
 
 
 class _Series:
