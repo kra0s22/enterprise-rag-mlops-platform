@@ -22,6 +22,7 @@ def evaluate_rag(
     metrics: list[str] | None = None,
     llm: Any | None = None,
     embeddings: Any | None = None,
+    evaluator: Any | None = None,
 ) -> dict[str, float]:
     """Evaluate a RAG dataset with Ragas and return metric scores.
 
@@ -32,15 +33,22 @@ def evaluate_rag(
         llm: Optional Ragas LLM wrapper; when omitted Ragas falls back to OpenAI.
         embeddings: Optional Ragas embeddings; when omitted Ragas falls back to
             OpenAI embeddings. Pass both to run fully self-hosted (e.g. Ollama).
+        evaluator: Optional callable with Ragas' ``evaluate`` signature; defaults
+            to ``ragas.evaluate``. Injected in tests to exercise the metric-mapping
+            logic without the ``eval`` extra installed.
 
     Returns:
         Mapping of metric name to score in [0, 1].
     """
-    from ragas import evaluate
+    selected = metrics or DEFAULT_METRICS
+    valid = [name for name in selected if name in DEFAULT_METRICS]
+    if not valid:
+        raise ValueError(f"No valid metrics requested; supported: {DEFAULT_METRICS}")
+
+    from ragas import evaluate as ragas_evaluate
     from ragas.dataset_schema import EvaluationDataset, SingleTurnSample
     from ragas.metrics import answer_relevancy, context_precision, context_recall, faithfulness
 
-    selected = metrics or DEFAULT_METRICS
     metric_map = {
         "faithfulness": faithfulness,
         "answer_relevancy": answer_relevancy,
@@ -56,18 +64,16 @@ def evaluate_rag(
         )
         for row in dataset
     ]
-    chosen = [metric_map[name] for name in selected if name in metric_map]
-    if not chosen:
-        raise ValueError(f"No valid metrics requested; supported: {list(metric_map)}")
+    chosen = [metric_map[name] for name in valid]
 
-    result = evaluate(
+    result = (evaluator or ragas_evaluate)(
         dataset=EvaluationDataset(samples=samples),
         metrics=chosen,
         llm=llm,
         embeddings=embeddings,
     )
     frame = result.to_pandas()
-    scores = {name: float(frame[name].mean()) for name in selected if name in metric_map}
+    scores = {name: float(frame[name].mean()) for name in valid}
     logger.info("Ragas evaluation completed: %s", scores)
     return scores
 

@@ -1,7 +1,7 @@
 """Hermetic tests for the Ragas evaluation helpers and the evaluation runner.
 
-The module is skipped when ``ragas`` is not installed, so CI (which installs only
-the ``dev`` extra) stays green while local runs exercise the tests.
+Only the test that builds real Ragas ``SingleTurnSample`` objects needs the
+``eval`` extra; the validation and answer-collection tests always run in CI.
 """
 
 from __future__ import annotations
@@ -10,8 +10,6 @@ import pytest
 
 from rag_platform.evaluation import ragas_eval
 from rag_platform.evaluation.run_evaluation import collect_answers
-
-ragas = pytest.importorskip("ragas")
 
 
 class _Series:
@@ -44,19 +42,21 @@ class _FakeResult:
         return self._frame
 
 
-def test_evaluate_rag_returns_metric_scores(monkeypatch) -> None:
+def test_evaluate_rag_returns_metric_scores() -> None:
+    pytest.importorskip("ragas")  # SingleTurnSample / EvaluationDataset need ragas
+
     def fake_evaluate(*, dataset, metrics, llm=None, embeddings=None) -> _FakeResult:
         assert len(dataset.samples) == 1
         assert llm == "fake-llm"
         assert embeddings == "fake-embeddings"
         return _FakeResult({"faithfulness": 0.9, "answer_relevancy": 0.8})
 
-    monkeypatch.setattr(ragas, "evaluate", fake_evaluate)
     scores = ragas_eval.evaluate_rag(
         [{"question": "q", "answer": "a", "contexts": ["ctx"]}],
         metrics=["faithfulness", "answer_relevancy"],
         llm="fake-llm",
         embeddings="fake-embeddings",
+        evaluator=fake_evaluate,
     )
     assert scores == {"faithfulness": 0.9, "answer_relevancy": 0.8}
 
