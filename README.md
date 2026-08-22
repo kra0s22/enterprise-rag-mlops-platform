@@ -82,6 +82,10 @@ repository** at `.conda/` (gitignored). Dev tools and the console scripts
 # Start / stop the vector DB (Docker)
 docker compose -f docker/docker-compose.yml up -d qdrant
 docker compose -f docker/docker-compose.yml down
+
+# Run the whole stack in Docker (API + Qdrant + MLflow). `--project-directory .`
+# is required so the `api` build context resolves to the repository root.
+docker compose -f docker/docker-compose.yml --project-directory . up -d --build
 ```
 
 > If `.conda\Scripts` is added to `PATH`, the shorter `pytest`, `ruff`, `rag-api`
