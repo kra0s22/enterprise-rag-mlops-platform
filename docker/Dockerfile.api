@@ -11,7 +11,11 @@ WORKDIR /app
 # Install the package first for better layer caching.
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install .
+# sentence-transformers pulls the CUDA build of torch on Linux by default;
+# install the CPU wheel so the serving image stays small and builds fast.
+RUN pip install --upgrade pip && \
+    pip install --index-url https://download.pytorch.org/whl/cpu torch && \
+    pip install .
 
 EXPOSE 8000
 
