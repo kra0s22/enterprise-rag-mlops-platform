@@ -5,8 +5,8 @@
 The platform is a modular, production-grade RAG system. Documents are ingested and
 chunked in a distributed fashion with PySpark, embedded with a local OSS model, and
 indexed into a vector database behind a common abstraction. A FastAPI service exposes
-ingestion and retrieval endpoints, while Ragas and MLflow cover evaluation and
-experiment tracking.
+ingestion and retrieval endpoints (dense, hybrid dense+sparse, and cross-encoder
+reranking), while Ragas and MLflow cover evaluation and experiment tracking.
 
 ```mermaid
 flowchart LR
@@ -46,7 +46,8 @@ so the whole process shares one configuration object.
 - **`spark_pipeline.py`** — expands a PySpark DataFrame of documents into chunk rows
   via a picklable UDF, enabling fully distributed chunking of large corpora.
 - **`cli.py`** — `rag-ingest` batch command: loads files, chunks, embeds, and upserts
-  into the configured vector store.
+  into the configured vector store. `--distributed` chunks through `spark_pipeline.py`
+  (a local PySpark session) instead of single-process tokenization.
 
 ### `embeddings/`
 
@@ -55,13 +56,34 @@ so the whole process shares one configuration object.
 `sentence-transformers` model (torch is never imported on the serving import path),
 normalizes embeddings, and batches encoding.
 
+`HashingSparseEncoder` produces deterministic, L2-normalized sparse vectors via
+feature hashing (sklearn). Queries and documents share the same vectorizer, so the
+index space stays aligned for hybrid retrieval; it can be swapped for a SPLADE model
+without changing call sites.
+
 ### `vectorstore/`
 
 `VectorStore` is the abstraction contract: `create_collection`, `upsert`, `search`,
 `delete`, `count`. `QdrantStore` and `MilvusStore` implement it. `build_vector_store`
 selects the backend from configuration, so the rest of the platform is
-backend-agnostic. The dense vector is named `dense` to leave room for a future sparse
-vector for hybrid search.
+backend-agnostic.
+
+Points carry a named dense vector (`dense`) and, for hybrid backends, an optional
+sparse vector (`sparse`). `supports_hybrid` gates `search_hybrid`, which Qdrant
+implements with native reciprocal rank fusion (prefetch of both vectors +
+`FusionQuery(RRF)`); Milvus stays dense-only and rejects sparse upserts.
+
+### `reranking/`
+
+`CrossEncoderReranker` scores `(query, candidate)` pairs with a
+`sentence-transformers` cross-encoder, and `rerank_hits` reorders a retrieved list
+while stamping the cross-encoder score. Endpoints fetch `rerank_top_k` candidates and
+trim to `top_k` when `rerank` is enabled.
+
+### `generation/`
+
+`OllamaClient` builds a strict "answer only from context" prompt and calls a local
+Ollama model, returning the grounded answer together with its retrieved sources.
 
 ### `api/`
 
@@ -69,17 +91,21 @@ FastAPI application with:
 
 - `POST /v1/ingest` — ingest a document (text + metadata) → chunk → embed → upsert.
 - `POST /v1/search` — embed a query and return top-k hits with metadata.
+- `POST /v1/rag` — retrieve context and generate a grounded answer with Ollama.
 - `GET /health` — liveness probe.
 
-Dependencies (`get_embedder`, `get_vector_store`) are created once and overridable in
-tests.
+Requests accept `hybrid` (dense+sparse RRF) and `rerank` (cross-encoder) flags.
+Dependencies (`get_embedder`, `get_vector_store`, `get_sparse_encoder`,
+`get_reranker`) are singletons, created once per process and overridable in tests.
 
 ### `evaluation/`
 
 `evaluate_rag` runs Ragas metrics (`faithfulness`, `answer_relevancy`,
 `context_precision`, `context_recall`) over a dataset of
 `{question, answer, contexts, ground_truth}` samples. Heavy Ragas imports are lazy so
-the serving path stays lean.
+the serving path stays lean. `run_evaluation` is an end-to-end runner: it queries
+`/v1/rag` for every question, persists the collected samples, scores them with a
+self-hosted LLM (Ollama) and optionally logs the run to MLflow.
 
 ### `mlflow_tracking/`
 
@@ -98,3 +124,9 @@ evaluation experiments.
   network access.
 - **Overlapping token chunks** — overlap mitigates context loss at chunk boundaries,
   improving retrieval quality for downstream RAG.
+- **Native hybrid fusion (RRF)** — Qdrant's prefetch + `FusionQuery(RRF)` merges dense
+  and sparse rankings server-side, with no client-side score arithmetic.
+- **Hashing sparse encoder** — dependency-free, deterministic sparse vectors; a SPLADE
+  model can replace it behind the same interface.
+- **Reranking as an opt-in flag** — a wider candidate set is re-scored by a
+  cross-encoder only when requested, keeping default latency minimal.

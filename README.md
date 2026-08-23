@@ -11,6 +11,7 @@ portfolio showcase targeting European tech companies.
 | Embeddings          | **SentenceTransformers** (local / OSS)                           |
 | Generation          | **Ollama** (`llama3.2:3b`) — grounded answers from retrieved context |
 | Vector Database     | **Qdrant** / **Milvus** (behind a common abstraction layer)      |
+| Retrieval           | Dense + sparse **hybrid search** (RRF) + **cross-encoder reranking** |
 | Serving API         | **FastAPI**                                                      |
 | Evaluation          | **Ragas** (faithfulness, answer relevancy, context precision/recall) |
 | Experiment tracking | **MLflow**                                                       |
@@ -21,14 +22,15 @@ portfolio showcase targeting European tech companies.
 
 ```
 .
-├── .github/workflows/ci.yml     # CI pipeline (lint + tests)
+├── .github/workflows/ci.yml     # CI: lint/tests, image build, on-demand eval
 ├── docker/                      # Dockerfiles + docker-compose
 ├── src/rag_platform/
 │   ├── config/                  # Pydantic-settings configuration
 │   ├── utils/                   # Logging helpers
 │   ├── ingestion/               # Loader, token chunker, PySpark pipeline, CLI
-│   ├── embeddings/              # SentenceTransformers provider
+│   ├── embeddings/              # Dense provider + hashing sparse encoder
 │   ├── generation/              # Ollama grounded-generation client
+│   ├── reranking/               # Cross-encoder reranking
 │   ├── vectorstore/             # VectorStore abstraction + Qdrant/Milvus backends
 │   ├── api/                     # FastAPI app (schemas, routes, dependencies)
 │   ├── evaluation/              # Ragas evaluation runner
@@ -135,6 +137,7 @@ Key variables:
 - `RAG_OLLAMA_URL` / `RAG_LLM_MODEL` — local Ollama endpoint and model for generation
 - `RAG_LLM_TEMPERATURE` / `RAG_LLM_MAX_TOKENS` — generation sampling controls
 - `RAG_SPARSE_DIM` — hashed sparse vector dimension used by hybrid retrieval
+- `RAG_RERANKER_MODEL` / `RAG_RERANK_TOP_K` — cross-encoder model and candidate count for reranking
 - `RAG_MLFLOW_TRACKING_URI` — MLflow server endpoint
 
 ## Hybrid search
@@ -143,6 +146,13 @@ Retrieval can fuse dense embeddings with hashing-based sparse vectors using
 reciprocal rank fusion (RRF). Send `"hybrid": true` on `/v1/search` or `/v1/rag`;
 documents are indexed with both representations automatically during ingestion.
 `RAG_SPARSE_DIM` controls the sparse index size.
+
+## Reranking
+
+Sending `"rerank": true` on `/v1/search` or `/v1/rag` retrieves a wider candidate
+set (`RAG_RERANK_TOP_K`, default 10) and re-scores it with a cross-encoder
+(`cross-encoder/ms-marco-MiniLM-L-6-v2`) before returning the final `top_k`,
+lifting precision over the raw bi-encoder ranking.
 
 ## Evaluation
 
