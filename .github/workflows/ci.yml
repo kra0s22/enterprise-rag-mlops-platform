@@ -50,9 +50,11 @@ jobs:
 
   real-evaluation:
     runs-on: ubuntu-latest
-    # Manual, on-demand evaluation against the versioned dataset; needs a judge
-    # LLM API key, so the job skips cleanly when the secret is not configured.
-    if: github.event_name == 'workflow_dispatch' && secrets.OPENAI_API_KEY != ''
+    # Manual, on-demand evaluation against the versioned dataset. The eval step
+    # runs only when the judge LLM API key secret is configured; `secrets` is
+    # only resolvable in step contexts, so the job-level `if` only gates on the
+    # trigger event and the secret check happens on the step.
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +66,7 @@ jobs:
         run: pip install -e ".[eval]"
 
       - name: Run the Ragas evaluation
+        if: secrets.OPENAI_API_KEY != ''
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python -m rag_platform.evaluation.ragas_eval --dataset data/eval_set.jsonl
