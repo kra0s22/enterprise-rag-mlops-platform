@@ -29,10 +29,16 @@ def store() -> QdrantStore:
 def client(store: QdrantStore, embedder: DummyEmbeddingProvider):
     from fastapi.testclient import TestClient
 
-    from rag_platform.api.dependencies import get_embedder, get_vector_store
+    from rag_platform.api.dependencies import (
+        get_embedder,
+        get_sparse_encoder,
+        get_vector_store,
+    )
+    from rag_platform.embeddings.sparse import HashingSparseEncoder
 
     app = create_app()
     app.dependency_overrides[get_vector_store] = lambda: store
     app.dependency_overrides[get_embedder] = lambda: embedder
+    app.dependency_overrides[get_sparse_encoder] = lambda: HashingSparseEncoder(n_features=64)
     with TestClient(app) as test_client:
         yield test_client

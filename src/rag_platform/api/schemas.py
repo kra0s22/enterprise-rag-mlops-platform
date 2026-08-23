@@ -31,6 +31,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Natural-language query")
     top_k: int = Field(default=5, ge=1, le=100, description="Number of hits to return")
     filters: dict[str, Any] = Field(default_factory=dict, description="Exact-match payload filters")
+    hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
 
 
 class SearchHitResponse(BaseModel):
@@ -57,6 +58,7 @@ class RagRequest(BaseModel):
     filters: dict[str, Any] = Field(
         default_factory=dict, description="Exact-match payload filters"
     )
+    hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
 
 
 class RagSource(BaseModel):

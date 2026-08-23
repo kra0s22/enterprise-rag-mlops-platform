@@ -134,7 +134,15 @@ Key variables:
 - `RAG_QDRANT_URL` / `RAG_MILVUS_URI` — vector DB endpoints
 - `RAG_OLLAMA_URL` / `RAG_LLM_MODEL` — local Ollama endpoint and model for generation
 - `RAG_LLM_TEMPERATURE` / `RAG_LLM_MAX_TOKENS` — generation sampling controls
+- `RAG_SPARSE_DIM` — hashed sparse vector dimension used by hybrid retrieval
 - `RAG_MLFLOW_TRACKING_URI` — MLflow server endpoint
+
+## Hybrid search
+
+Retrieval can fuse dense embeddings with hashing-based sparse vectors using
+reciprocal rank fusion (RRF). Send `"hybrid": true` on `/v1/search` or `/v1/rag`;
+documents are indexed with both representations automatically during ingestion.
+`RAG_SPARSE_DIM` controls the sparse index size.
 
 ## Evaluation
 
