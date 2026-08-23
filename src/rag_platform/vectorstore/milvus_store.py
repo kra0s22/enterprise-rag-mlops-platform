@@ -79,7 +79,15 @@ class MilvusStore(VectorStore):
         )
         logger.info("Created Milvus collection '%s' (dim=%s)", self._collection, self._vector_size)
 
-    def upsert(self, ids: list[str], vectors: np.ndarray, payloads: list[dict[str, Any]]) -> None:
+    def upsert(
+        self,
+        ids: list[str],
+        vectors: np.ndarray,
+        payloads: list[dict[str, Any]],
+        sparse_vectors: list[Any] | None = None,
+    ) -> None:
+        if sparse_vectors is not None:
+            raise NotImplementedError("MilvusStore does not support hybrid (sparse) vectors")
         self._connect()
         collection = self._Collection(self._collection)
         rows = [

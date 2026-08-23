@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 32
     embedding_dimension: int = 384
 
+    # Hybrid search (dense + sparse)
+    sparse_dim: int = 4096
+
     # Chunking
     chunk_size: int = 512
     chunk_overlap: int = 64
