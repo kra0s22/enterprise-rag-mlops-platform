@@ -15,6 +15,7 @@ from typing import Any
 
 from rag_platform.config.settings import get_settings
 from rag_platform.embeddings.provider import build_embedding_provider
+from rag_platform.embeddings.sparse import HashingSparseEncoder
 from rag_platform.ingestion.chunker import chunk_text
 from rag_platform.ingestion.loader import DocumentLoadError, load_document
 from rag_platform.utils.ids import make_chunk_id
@@ -60,11 +61,18 @@ def load_documents(paths: Sequence[Path]) -> list[dict[str, Any]]:
     return rows
 
 
-def ingest_chunks(embedder: Any, store: VectorStore, chunks: Sequence[dict[str, Any]]) -> int:
+def ingest_chunks(
+    embedder: Any,
+    store: VectorStore,
+    chunks: Sequence[dict[str, Any]],
+    sparse_encoder: HashingSparseEncoder | None = None,
+) -> int:
     """Embed and upsert chunk rows; returns the number of chunks stored.
 
     Each chunk row carries ``document_id``, ``chunk_index``, ``chunk_text`` and a
-    ``metadata`` mapping that is merged into the vector payload.
+    ``metadata`` mapping that is merged into the vector payload. When a
+    ``sparse_encoder`` is provided, sparse vectors are stored alongside the dense
+    ones so hybrid retrieval can use the points.
     """
     if not chunks:
         return 0
@@ -79,7 +87,10 @@ def ingest_chunks(embedder: Any, store: VectorStore, chunks: Sequence[dict[str, 
         }
         for chunk in chunks
     ]
-    store.upsert(ids, vectors, payloads)
+    sparse_vectors = None
+    if sparse_encoder is not None:
+        sparse_vectors = sparse_encoder.encode_batch([chunk["chunk_text"] for chunk in chunks])
+    store.upsert(ids, vectors, payloads, sparse_vectors=sparse_vectors)
     return len(chunks)
 
 
@@ -128,6 +139,7 @@ def main() -> None:
     embedder = build_embedding_provider(settings)
     store = build_vector_store(settings, embedder.dimension)
     store.create_collection()
+    sparse_encoder = HashingSparseEncoder(n_features=settings.sparse_dim)
 
     documents = load_documents(args.paths)
     if not documents:
@@ -136,7 +148,7 @@ def main() -> None:
 
     if args.distributed:
         chunks = _distributed_chunks(documents, settings.chunk_size, settings.chunk_overlap)
-        total = ingest_chunks(embedder, store, chunks)
+        total = ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
         logger.info("Distributed ingestion finished: %d chunks upserted", total)
         return
 
@@ -154,7 +166,7 @@ def main() -> None:
             )
         ]
         if chunks:
-            total += ingest_chunks(embedder, store, chunks)
+            total += ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
             logger.info("Ingested %s (%d chunks)", doc["metadata"]["source"], len(chunks))
 
     logger.info("Ingestion finished: %d chunks upserted", total)

@@ -7,10 +7,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from rag_platform.api.dependencies import get_embedder, get_vector_store
+from rag_platform.api.dependencies import get_embedder, get_sparse_encoder, get_vector_store
 from rag_platform.api.schemas import IngestRequest, IngestResponse
 from rag_platform.config.settings import get_settings
 from rag_platform.embeddings.provider import EmbeddingProvider
+from rag_platform.embeddings.sparse import HashingSparseEncoder
 from rag_platform.ingestion.chunker import chunk_text
 from rag_platform.utils.ids import make_chunk_id
 from rag_platform.utils.logging import get_logger
@@ -21,6 +22,7 @@ logger = get_logger(__name__)
 
 StoreDep = Annotated[VectorStore, Depends(get_vector_store)]
 EmbedderDep = Annotated[EmbeddingProvider, Depends(get_embedder)]
+SparseDep = Annotated[HashingSparseEncoder, Depends(get_sparse_encoder)]
 
 
 @router.post("", response_model=IngestResponse, status_code=201, summary="Ingest a document")
@@ -28,6 +30,7 @@ def ingest_document(
     request: IngestRequest,
     store: StoreDep,
     embedder: EmbedderDep,
+    sparse_encoder: SparseDep,
 ) -> IngestResponse:
     """Chunk, embed, and store a document. Returns the ids of the stored chunks."""
     settings = get_settings()
@@ -47,6 +50,11 @@ def ingest_document(
         }
         for i, chunk in enumerate(chunks)
     ]
-    store.upsert(ids, vectors, payloads)
+    store.upsert(
+        ids,
+        vectors,
+        payloads,
+        sparse_vectors=sparse_encoder.encode_batch(chunks),
+    )
     logger.info("Ingested document '%s' (%d chunks)", document_id, len(chunks))
     return IngestResponse(document_id=document_id, num_chunks=len(chunks), stored_ids=ids)

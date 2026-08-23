@@ -22,10 +22,16 @@ class _FakeEmbedder:
 
 class _FakeStore:
     def __init__(self) -> None:
-        self.upserted: list[tuple[list, list, list]] = []
+        self.upserted: list[tuple[list, list, list, list | None]] = []
 
-    def upsert(self, ids: list[str], vectors: list, payloads: list[dict]) -> None:
-        self.upserted.append((list(ids), list(vectors), list(payloads)))
+    def upsert(
+        self,
+        ids: list[str],
+        vectors: list,
+        payloads: list[dict],
+        sparse_vectors: list | None = None,
+    ) -> None:
+        self.upserted.append((list(ids), list(vectors), list(payloads), sparse_vectors))
 
 
 def test_load_documents_reads_supported_files(tmp_path) -> None:
@@ -61,8 +67,9 @@ def test_ingest_chunks_embeds_and_upserts() -> None:
 
     assert count == 2
     assert len(store.upserted) == 1
-    ids, vectors, payloads = store.upserted[0]
+    ids, vectors, payloads, sparse_vectors = store.upserted[0]
     assert len(ids) == 2 and len(vectors) == 2
+    assert sparse_vectors is None
     assert payloads[0]["source"] == "s"
     assert payloads[0]["chunk_text"] == "c0"
 
@@ -71,6 +78,30 @@ def test_ingest_chunks_empty_returns_zero() -> None:
     store = _FakeStore()
     assert cli.ingest_chunks(_FakeEmbedder(), store, []) == 0
     assert store.upserted == []
+
+
+def test_ingest_chunks_with_sparse_encoder_passes_sparse_vectors() -> None:
+    from rag_platform.embeddings.sparse import HashingSparseEncoder
+
+    store = _FakeStore()
+    chunks = [
+        {
+            "document_id": "d1",
+            "chunk_index": 0,
+            "chunk_text": "quantum physics",
+            "metadata": {"source": "s"},
+        }
+    ]
+    cli.ingest_chunks(
+        _FakeEmbedder(),
+        store,
+        chunks,
+        sparse_encoder=HashingSparseEncoder(n_features=32),
+    )
+    _, _, _, sparse_vectors = store.upserted[0]
+    assert sparse_vectors is not None
+    assert len(sparse_vectors) == 1
+    assert sparse_vectors[0].indices  # non-empty sparse vector
 
 
 def test_distributed_chunks_collects_spark_rows(monkeypatch) -> None:
