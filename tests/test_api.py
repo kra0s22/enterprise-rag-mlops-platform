@@ -97,3 +97,18 @@ def test_search_hybrid_unsupported_backend_returns_400() -> None:
     with TestClient(app) as test_client:
         response = test_client.post("/v1/search", json={"query": "q", "hybrid": True})
     assert response.status_code == 400
+
+
+def test_search_rerank_reorders_by_cross_encoder(client, store, embedder) -> None:
+    texts = ["quantum physics is tiny", "the cat sat on the mat"]
+    store.upsert(
+        [str(uuid.uuid4()), str(uuid.uuid4())],
+        embedder.embed_documents(texts),
+        [{"chunk_text": t} for t in texts],
+    )
+
+    response = client.post("/v1/search", json={"query": "cat", "top_k": 1, "rerank": True})
+
+    assert response.status_code == 200
+    hits = response.json()["hits"]
+    assert hits and hits[0]["chunk_text"] == "the cat sat on the mat"

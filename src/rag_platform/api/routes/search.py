@@ -6,10 +6,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from rag_platform.api.dependencies import get_embedder, get_sparse_encoder, get_vector_store
+from rag_platform.api.dependencies import (
+    get_embedder,
+    get_reranker,
+    get_sparse_encoder,
+    get_vector_store,
+)
 from rag_platform.api.schemas import SearchHitResponse, SearchRequest, SearchResponse
+from rag_platform.config.settings import get_settings
 from rag_platform.embeddings.provider import EmbeddingProvider
 from rag_platform.embeddings.sparse import HashingSparseEncoder
+from rag_platform.reranking.reranker import Reranker, rerank_hits
 from rag_platform.utils.logging import get_logger
 from rag_platform.vectorstore.base import VectorStore
 
@@ -19,6 +26,7 @@ logger = get_logger(__name__)
 StoreDep = Annotated[VectorStore, Depends(get_vector_store)]
 EmbedderDep = Annotated[EmbeddingProvider, Depends(get_embedder)]
 SparseDep = Annotated[HashingSparseEncoder, Depends(get_sparse_encoder)]
+RerankDep = Annotated[Reranker, Depends(get_reranker)]
 
 
 @router.post("", response_model=SearchResponse, summary="Search the vector store")
@@ -27,8 +35,11 @@ def search(
     store: StoreDep,
     embedder: EmbedderDep,
     sparse_encoder: SparseDep,
+    reranker: RerankDep,
 ) -> SearchResponse:
     """Embed the query and return the top-k nearest chunks."""
+    settings = get_settings()
+    retrieve_k = settings.rerank_top_k if request.rerank else request.top_k
     if request.hybrid:
         if not store.supports_hybrid:
             raise HTTPException(
@@ -38,12 +49,14 @@ def search(
         hits = store.search_hybrid(
             embedder.embed_query(request.query),
             sparse_encoder.encode(request.query),
-            top_k=request.top_k,
+            top_k=retrieve_k,
             filters=request.filters,
         )
     else:
         query_vector = embedder.embed_query(request.query)
-        hits = store.search(query_vector, top_k=request.top_k, filters=request.filters)
+        hits = store.search(query_vector, top_k=retrieve_k, filters=request.filters)
+    if request.rerank:
+        hits = rerank_hits(hits, request.query, reranker, request.top_k)
     return SearchResponse(
         query=request.query,
         hits=[

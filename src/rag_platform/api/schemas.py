@@ -32,6 +32,9 @@ class SearchRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=100, description="Number of hits to return")
     filters: dict[str, Any] = Field(default_factory=dict, description="Exact-match payload filters")
     hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
+    rerank: bool = Field(
+        default=False, description="Rerank candidates with a cross-encoder"
+    )
 
 
 class SearchHitResponse(BaseModel):
@@ -59,6 +62,9 @@ class RagRequest(BaseModel):
         default_factory=dict, description="Exact-match payload filters"
     )
     hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
+    rerank: bool = Field(
+        default=False, description="Rerank context candidates with a cross-encoder"
+    )
 
 
 class RagSource(BaseModel):
