@@ -79,6 +79,9 @@ repository** at `.conda/` (gitignored). Dev tools and the console scripts
 # Batch-ingest local documents into the vector store
 .conda\python.exe -m rag_platform.ingestion.cli ./data/sample
 
+# Distributed chunking with PySpark (requires a JDK reachable via JAVA_HOME)
+.conda\python.exe -m rag_platform.ingestion.cli --distributed ./data/sample
+
 # Start / stop the vector DB (Docker)
 docker compose -f docker/docker-compose.yml up -d qdrant
 docker compose -f docker/docker-compose.yml down
