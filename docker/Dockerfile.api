@@ -1,4 +1,4 @@
-# Lean serving image: core deps only (evaluation stack is optional).
+# Serving + ingestion image: core deps only (evaluation stack is optional).
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +16,11 @@ COPY src ./src
 RUN pip install --upgrade pip && \
     pip install --index-url https://download.pytorch.org/whl/cpu torch && \
     pip install .
+
+# PySpark (a core dependency) needs a JVM for `rag-ingest --distributed`.
+# python:3.11-slim is Debian trixie, which only ships OpenJDK 21.
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
 
