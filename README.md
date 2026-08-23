@@ -172,6 +172,10 @@ python -m rag_platform.evaluation.run_evaluation \
 The dataset is a JSONL file with `{question, ground_truth}`; the runner writes the collected
 answers and retrieved contexts to `data/eval_results.jsonl` for reproducibility.
 
+An on-demand CI job (`real-evaluation`) runs the same evaluation on every manual
+dispatch when an `OPENAI_API_KEY` secret is configured, so model quality can be
+tracked over time without a local LLM.
+
 ## License
 
 Proprietary. For portfolio demonstration purposes only.

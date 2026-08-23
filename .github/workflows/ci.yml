@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   lint-and-test:
@@ -46,3 +47,23 @@ jobs:
 
       - name: Smoke test the image
         run: docker run --rm rag-platform-api:ci python -c "from rag_platform.api.main import app; assert app.title == 'RAG Platform API'"
+
+  real-evaluation:
+    runs-on: ubuntu-latest
+    # Manual, on-demand evaluation against the versioned dataset; needs a judge
+    # LLM API key, so the job skips cleanly when the secret is not configured.
+    if: github.event_name == 'workflow_dispatch' && secrets.OPENAI_API_KEY != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the evaluation stack
+        run: pip install -e ".[eval]"
+
+      - name: Run the Ragas evaluation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python -m rag_platform.evaluation.ragas_eval --dataset data/eval_set.jsonl
