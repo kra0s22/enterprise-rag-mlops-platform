@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import shutil
 from types import SimpleNamespace
+
+import pytest
 
 import rag_platform.ingestion.cli as cli
 
@@ -110,3 +113,18 @@ def test_distributed_chunks_collects_spark_rows(monkeypatch) -> None:
         {"document_id": "d1", "chunk_index": 0, "chunk_text": "c0", "metadata": {"source": "s"}},
         {"document_id": "d1", "chunk_index": 1, "chunk_text": "c1", "metadata": {"source": "s"}},
     ]
+
+
+@pytest.mark.skipif(shutil.which("java") is None, reason="Java/JDK not installed")
+def test_distributed_chunks_runs_with_real_spark() -> None:
+    """Functional: chunk a document with a real local SparkSession (needs Java)."""
+    rows = cli._distributed_chunks(
+        [{"document_id": "d1", "text": "word " * 700, "metadata": {"source": "s"}}],
+        100,
+        10,
+    )
+    assert len(rows) > 1
+    for row in rows:
+        assert row["document_id"] == "d1"
+        assert row["metadata"] == {"source": "s"}
+        assert row["chunk_text"]
