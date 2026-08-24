@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +107,11 @@ def main() -> None:
 
     settings = get_settings()
     configure_logging(settings.log_level)
+
+    # Windows consoles default to cp1252, which MLflow's run-URL banner (emoji)
+    # cannot encode; force UTF-8 so ending a run never crashes on stdout.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
     rows = [
         json.loads(line)
