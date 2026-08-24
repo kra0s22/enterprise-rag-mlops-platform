@@ -5,22 +5,22 @@ portfolio showcase targeting European tech companies.
 
 ## Tech Stack
 
-| Layer               | Technology                                                      |
-| ------------------- | --------------------------------------------------------------- |
-| Distributed ingestion| **PySpark** (distributed text processing & chunking)             |
-| Embeddings          | **SentenceTransformers** (local / OSS)                           |
-| Generation          | **Ollama** (`llama3.2:3b`) — grounded answers from retrieved context |
-| Vector Database     | **Qdrant** / **Milvus** (behind a common abstraction layer)      |
-| Retrieval           | Dense + sparse **hybrid search** (RRF) + **cross-encoder reranking** |
-| Serving API         | **FastAPI**                                                      |
-| Evaluation          | **Ragas** (faithfulness, answer relevancy, context precision/recall) |
-| Experiment tracking | **MLflow**                                                       |
-| Testing             | **pytest**                                                       |
-| Deployment          | **Docker** + **docker-compose**                                  |
+| Layer                 | Technology                                                           |
+| --------------------- | -------------------------------------------------------------------- |
+| Distributed ingestion | **PySpark** (distributed text processing & chunking)                 |
+| Embeddings            | **SentenceTransformers** (local / OSS)                               |
+| Generation            | **Ollama** (`llama3.2:3b`) — grounded answers from retrieved context |
+| Vector Database       | **Qdrant** / **Milvus** (behind a common abstraction layer)          |
+| Retrieval             | Dense + sparse **hybrid search** (RRF) + **cross-encoder reranking** |
+| Serving API           | **FastAPI**                                                          |
+| Evaluation            | **Ragas** (faithfulness, answer relevancy, context precision/recall) |
+| Experiment tracking   | **MLflow**                                                           |
+| Testing               | **pytest** (hermetic unit tests + opt-in integration suite)          |
+| Deployment            | **Docker** + **docker-compose**                                      |
 
 ## Repository Layout
 
-```
+```text
 .
 ├── .github/workflows/ci.yml     # CI: lint/tests, image build, on-demand eval
 ├── docker/                      # Dockerfiles + docker-compose
@@ -35,7 +35,7 @@ portfolio showcase targeting European tech companies.
 │   ├── api/                     # FastAPI app (schemas, routes, dependencies)
 │   ├── evaluation/              # Ragas evaluation runner
 │   └── mlflow_tracking/         # MLflow experiment tracking
-├── tests/                       # pytest suites (chunking, retrieval, API)
+├── tests/                       # pytest suites (unit, API, opt-in integration)
 ├── pyproject.toml               # Packaging, deps, lint/test config
 └── .env.example                 # Environment variable reference
 ```
@@ -96,14 +96,35 @@ docker compose -f docker/docker-compose.yml --project-directory . up -d --build
 > If `.conda\Scripts` is added to `PATH`, the shorter `pytest`, `ruff`, `rag-api`
 > and `rag-ingest` commands also work.
 
+## Testing
+
+The suite is split in two layers that complement each other:
+
+- **Hermetic unit/API tests** (the default `pytest` run, also what CI executes): run
+  offline with an in-memory Qdrant, a hash-based fake embedder and fake rerankers —
+  deterministic and fast, they validate chunking, retrieval and API contracts without
+  any model download, server or network.
+- **Opt-in integration tests** (`tests/test_integration.py`): exercise the real stack
+  (API + Qdrant + Ollama) end to end — health, dense/hybrid/reranked search and a
+  grounded `/v1/rag` answer. They skip unless enabled, so CI stays deterministic:
+
+```bash
+# Hermetic suite (what CI runs)
+python -m pytest
+
+# Integration suite against a live stack (see docker/docker-compose.yml)
+$env:RAG_RUN_INTEGRATION = "1"
+python -m pytest tests/test_integration.py -v
+```
+
 ## API Endpoints
 
-| Method | Endpoint | Description |
-| ------ | -------- | ----------- |
-| `POST` | `/v1/ingest` | Chunk, embed, and store a document |
-| `POST` | `/v1/search` | Retrieve the top-k nearest chunks for a query |
-| `POST` | `/v1/rag` | Retrieve context and generate a grounded answer with Ollama |
-| `GET`  | `/health` | Liveness probe |
+| Method | Endpoint     | Description                                                 |
+| ------ | ------------ | ----------------------------------------------------------- |
+| `POST` | `/v1/ingest` | Chunk, embed, and store a document                          |
+| `POST` | `/v1/search` | Retrieve the top-k nearest chunks for a query               |
+| `POST` | `/v1/rag`    | Retrieve context and generate a grounded answer with Ollama |
+| `GET`  | `/health`    | Liveness probe                                              |
 
 ### Grounded generation — `POST /v1/rag`
 
@@ -185,6 +206,11 @@ answers and retrieved contexts to `data/eval_results.jsonl` for reproducibility.
 An on-demand CI job (`real-evaluation`) runs the same evaluation on every manual
 dispatch when an `OPENAI_API_KEY` secret is configured, so model quality can be
 tracked over time without a local LLM.
+
+A recent real run on the sample corpus (3 questions, `top_k 3`, judge `llama3.2:3b`,
+dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relevancy
+0.70**, **context precision 0.92** and **context recall 0.73** on a clean
+three-chunk collection, validating the retrieval + generation path end to end.
 
 ## License
 
