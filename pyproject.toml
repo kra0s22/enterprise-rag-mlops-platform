@@ -74,6 +74,9 @@ testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "-q"
 asyncio_mode = "auto"
+markers = [
+    "integration: requires a live stack (API + Qdrant + Ollama); opt-in via RAG_RUN_INTEGRATION=1",
+]
 
 [tool.ruff]
 line-length = 100
