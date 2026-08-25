@@ -33,17 +33,26 @@ def collect_answers(
     dataset: list[dict[str, Any]],
     api_url: str,
     top_k: int,
+    hybrid: bool = False,
+    rerank: bool = False,
     timeout: float = 300.0,
 ) -> list[dict[str, Any]]:
     """Query /v1/rag for each question and build Ragas samples with the answers.
 
     Each returned sample keeps ``question``, ``answer``, the retrieved
     ``contexts`` and the optional ``ground_truth`` for reference-based metrics.
+    ``hybrid`` and ``rerank`` select the retrieval mode on the /v1/rag endpoint,
+    enabling an A/B comparison of dense vs hybrid+reranked retrieval.
     """
     results: list[dict[str, Any]] = []
     with httpx.Client(base_url=api_url, timeout=timeout) as client:
         for row in dataset:
-            response = client.post("/v1/rag", json={"query": row["question"], "top_k": top_k})
+            payload: dict[str, Any] = {"query": row["question"], "top_k": top_k}
+            if hybrid:
+                payload["hybrid"] = True
+            if rerank:
+                payload["rerank"] = True
+            response = client.post("/v1/rag", json=payload)
             response.raise_for_status()
             body = response.json()
             results.append(
@@ -103,6 +112,12 @@ def main() -> None:
     parser.add_argument(
         "--mlflow", action="store_true", help="Log experiment parameters and metrics to MLflow"
     )
+    parser.add_argument(
+        "--hybrid", action="store_true", help="Use hybrid dense+sparse retrieval"
+    )
+    parser.add_argument(
+        "--rerank", action="store_true", help="Rerank candidates with the cross-encoder"
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -118,7 +133,9 @@ def main() -> None:
         for line in args.dataset.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    samples = collect_answers(rows, args.api_url, args.top_k)
+    samples = collect_answers(
+        rows, args.api_url, args.top_k, hybrid=args.hybrid, rerank=args.rerank
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         "\n".join(json.dumps(sample, ensure_ascii=False) for sample in samples),
@@ -139,6 +156,13 @@ def main() -> None:
     if args.mlflow:
         from rag_platform.mlflow_tracking.tracker import log_metrics, track_run
 
+        retrieval = (
+            "hybrid+rerank"
+            if args.hybrid and args.rerank
+            else "hybrid"
+            if args.hybrid
+            else "dense"
+        )
         params = {
             "llm_model": settings.llm_model,
             "llm_temperature": settings.llm_temperature,
@@ -146,11 +170,16 @@ def main() -> None:
             "top_k": args.top_k,
             "dataset": str(args.dataset),
             "n_samples": len(samples),
+            "retrieval": retrieval,
+            "hybrid": args.hybrid,
+            "rerank": args.rerank,
         }
         metrics = {name: value for name, value in scores.items() if not math.isnan(value)}
-        with track_run(run_name=f"rag-eval-{settings.llm_model}", params=params):
+        with track_run(run_name=f"rag-eval-{settings.llm_model}-{retrieval}", params=params):
             log_metrics(metrics)
-        logger.info("Evaluation logged to MLflow with metrics: %s", metrics)
+        logger.info(
+            "Evaluation (%s) logged to MLflow with metrics: %s", retrieval, metrics
+        )
 
 
 if __name__ == "__main__":
