@@ -212,6 +212,40 @@ dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relev
 0.70**, **context precision 0.92** and **context recall 0.73** on a clean
 three-chunk collection, validating the retrieval + generation path end to end.
 
+## Roadmap
+
+Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
+
+### Retrieval quality
+
+- Multi-chunk sample corpus (documents sized for several chunks per file)
+- Chunk-level retrieval metrics — `MRR@k`, `nDCG@k`, hit-rate@k
+- Ablation of `chunk_size` × `chunk_overlap` logged to MLflow
+- Structure-aware (semantic) chunking
+
+### Retrieval tuning
+
+- Dense/sparse weight and RRF-`k` sweep
+- Rerank candidate-pool sweep (`RAG_RERANK_TOP_K`)
+- Query expansion / HyDE
+
+### Production hardening
+
+- API authentication and rate limiting
+- Observability (OpenTelemetry, latency histograms)
+- Knowledge-base freshness and drift monitoring
+
+### Scale & architecture
+
+- Streaming ingestion (Spark structured streaming)
+- Multi-tenancy (per-tenant partition isolation)
+- Hybrid retrieval validation on Milvus (currently Qdrant-only)
+
+### Ops
+
+- Harden the serving base image (CVE pinning)
+- Wire `OPENAI_API_KEY` secret for the on-demand `real-evaluation` CI job
+
 ## License
 
 Proprietary. For portfolio demonstration purposes only.
