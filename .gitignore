@@ -29,8 +29,9 @@ data/*
 artifacts/
 *.parquet
 *.jsonl
-# Keep the sample evaluation dataset versioned.
+# Keep the versioned evaluation datasets (end-to-end + chunk-level retrieval).
 !data/eval_set.jsonl
+!data/retrieval_set.jsonl
 
 # IDE
 .vscode/

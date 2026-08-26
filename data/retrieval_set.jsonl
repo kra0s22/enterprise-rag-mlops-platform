@@ -1,0 +1,8 @@
+{"query": "What is Qdrant used for in this platform?", "relevant": [["data\\sample\\vector-databases.md", 0], ["data\\sample\\qdrant-vs-milvus.md", 0], ["data\\sample\\qdrant-vs-milvus.md", 1]]}
+{"query": "How does Apache Spark handle large-scale data processing?", "relevant": [["data\\sample\\apache-spark.md", 0], ["data\\sample\\spark-execution-model.md", 0]]}
+{"query": "What signals typically characterize card fraud?", "relevant": [["data\\sample\\fraud-detection.md", 0]]}
+{"query": "How does reciprocal rank fusion combine dense and sparse retrieval?", "relevant": [["data\\sample\\hybrid-retrieval.md", 0]]}
+{"query": "What is structured streaming and how does it handle late data?", "relevant": [["data\\sample\\spark-structured-streaming.md", 0]]}
+{"query": "Why is feature engineering important for fraud detection?", "relevant": [["data\\sample\\fraud-feature-engineering.md", 0]]}
+{"query": "What is a cross-encoder reranker and why use it?", "relevant": [["data\\sample\\hybrid-retrieval.md", 1]]}
+{"query": "How does PySpark distribute chunking in the ingestion pipeline?", "relevant": [["data\\sample\\apache-spark.md", 1], ["data\\sample\\spark-execution-model.md", 1]]}

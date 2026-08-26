@@ -207,6 +207,23 @@ An on-demand CI job (`real-evaluation`) runs the same evaluation on every manual
 dispatch when an `OPENAI_API_KEY` secret is configured, so model quality can be
 tracked over time without a local LLM.
 
+### Chunk-level retrieval metrics
+
+The retrieval stage is also evaluated in isolation, without any LLM, so a gain can
+be attributed to the store itself rather than to the generator. `run_retrieval_eval`
+queries `/v1/search` for every query in `data/retrieval_set.jsonl` and scores the
+ranked chunks with **MRR@k**, **hit-rate@k** and **nDCG@k**:
+
+```bash
+python -m rag_platform.evaluation.run_retrieval_eval \
+    --dataset ./data/retrieval_set.jsonl --api-url http://127.0.0.1:8000 --top-k 5 \
+    --hybrid --rerank --mlflow
+```
+
+On the sample corpus the three modes logged to MLflow show **hybrid+rerank
+MRR@5 1.00 / nDCG@5 0.97**, dense 0.94/0.93, and hybrid alone 0.85/0.90 — the
+sparse signal can hurt on a small corpus, but reranking recovers and beats both.
+
 A recent real run on the sample corpus (3 questions, `top_k 3`, judge `llama3.2:3b`,
 dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relevancy
 0.70**, **context precision 0.92** and **context recall 0.73** on a clean
@@ -218,8 +235,6 @@ Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
 
 ### Retrieval quality
 
-- Multi-chunk sample corpus (documents sized for several chunks per file)
-- Chunk-level retrieval metrics — `MRR@k`, `nDCG@k`, hit-rate@k
 - Ablation of `chunk_size` × `chunk_overlap` logged to MLflow
 - Structure-aware (semantic) chunking
 

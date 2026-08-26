@@ -109,6 +109,11 @@ self-hosted LLM (Ollama) and optionally logs the run to MLflow. `--hybrid`/`--re
 switch the retrieval mode (dense by default), which is recorded as the `retrieval`
 run parameter so retrieval variants can be compared (A/B) in MLflow.
 
+`retrieval_metrics.py` provides pure, deterministic chunk-level metrics (`MRR@k`,
+`hit-rate@k`, `nDCG@k`) over ranked lists of `(source, chunk_index)` keys, and
+`run_retrieval_eval` scores the `/v1/search` ranking for a labelled query set,
+allowing the retrieval stage to be tuned independently of the generator.
+
 ### `mlflow_tracking/`
 
 `track_run` is a context manager that opens an MLflow run and logs parameters; metrics
