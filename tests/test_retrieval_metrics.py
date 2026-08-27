@@ -6,6 +6,7 @@ import math
 
 from rag_platform.evaluation.retrieval_metrics import (
     ChunkKey,
+    chunk_indices_for_keywords,
     hit_rate_at_k,
     mrr_at_k,
     ndcg_at_k,
@@ -58,3 +59,23 @@ def test_ndcg_empty_relevant() -> None:
 
 def test_ndcg_zero_cutoff() -> None:
     assert ndcg_at_k(RELEVANT, RANKED, k=0) == 0.0
+
+
+TEXT = " ".join(f"word{i}" for i in range(100)) + " signal watermark tail"
+
+
+def test_keywords_find_matching_chunk() -> None:
+    indices = chunk_indices_for_keywords(TEXT, ["watermark"], chunk_size=30, chunk_overlap=5)
+    assert indices == [3]
+
+
+def test_keywords_absent_returns_empty() -> None:
+    assert chunk_indices_for_keywords(TEXT, ["nonexistent"], 30, 5) == []
+
+
+def test_keywords_case_insensitive() -> None:
+    assert chunk_indices_for_keywords("Hello World", ["hello"], 10, 0) == [0]
+
+
+def test_keywords_empty_list() -> None:
+    assert chunk_indices_for_keywords(TEXT, [], 30, 5) == []

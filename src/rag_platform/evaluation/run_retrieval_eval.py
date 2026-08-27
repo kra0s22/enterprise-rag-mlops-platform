@@ -23,6 +23,7 @@ import httpx
 from rag_platform.config.settings import get_settings
 from rag_platform.evaluation.retrieval_metrics import (
     ChunkKey,
+    chunk_indices_for_keywords,
     hit_rate_at_k,
     mrr_at_k,
     ndcg_at_k,
@@ -54,17 +55,41 @@ def _search(
     ]
 
 
-def score_query(
+def resolve_relevant(
     relevant: list[list[Any]],
+    chunk_size: int,
+    chunk_overlap: int,
+) -> set[ChunkKey]:
+    """Resolve ``[source, keyword]`` relevance pairs to concrete chunk keys.
+
+    Reads each source file, chunks it with the ingestion chunking config, and
+    keeps the chunks containing any keyword. Relevance therefore stays aligned
+    with the indexed collection when chunking changes (e.g. in ablations).
+    """
+    keys: set[ChunkKey] = set()
+    for source, keyword in relevant:
+        path = Path(str(source))
+        if not path.exists():
+            logger.warning("Relevant source not found: %s", source)
+            continue
+        text = path.read_text(encoding="utf-8")
+        for index in chunk_indices_for_keywords(
+            text, [str(keyword)], chunk_size, chunk_overlap
+        ):
+            keys.add((str(source), index))
+    return keys
+
+
+def score_query(
+    relevant: set[ChunkKey],
     ranked: list[ChunkKey],
     top_k: int,
 ) -> dict[str, float]:
     """Score one query: MRR@k, hit-rate@k and nDCG@k against the ranked chunks."""
-    relevant_keys = {(str(source), int(index)) for source, index in relevant}
     return {
-        "mrr_at_k": mrr_at_k(relevant_keys, ranked, top_k),
-        "hit_rate_at_k": hit_rate_at_k(relevant_keys, ranked, top_k),
-        "ndcg_at_k": ndcg_at_k(relevant_keys, ranked, top_k),
+        "mrr_at_k": mrr_at_k(relevant, ranked, top_k),
+        "hit_rate_at_k": hit_rate_at_k(relevant, ranked, top_k),
+        "ndcg_at_k": ndcg_at_k(relevant, ranked, top_k),
     }
 
 
@@ -84,12 +109,29 @@ def main() -> None:
     parser.add_argument(
         "--mlflow", action="store_true", help="Log experiment parameters and metrics to MLflow"
     )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=None,
+        help="Chunk size used at ingestion (for keyword relevance resolution)",
+    )
+    parser.add_argument(
+        "--chunk-overlap",
+        type=int,
+        default=None,
+        help="Chunk overlap used at ingestion (for keyword relevance resolution)",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
     configure_logging(settings.log_level)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+
+    chunk_size = args.chunk_size if args.chunk_size else settings.chunk_size
+    chunk_overlap = (
+        args.chunk_overlap if args.chunk_overlap is not None else settings.chunk_overlap
+    )
 
     rows = [
         json.loads(line)
@@ -102,7 +144,10 @@ def main() -> None:
         ranked = _search(
             args.api_url, row["query"], args.top_k, args.hybrid, args.rerank
         )
-        scores = score_query(row.get("relevant", []), ranked, args.top_k)
+        relevant = resolve_relevant(
+            row.get("relevant", []), chunk_size, chunk_overlap
+        )
+        scores = score_query(relevant, ranked, args.top_k)
         per_query.append({"query": row["query"], "scores": scores})
         logger.info("Query %r -> %s", row["query"], scores)
 
@@ -129,6 +174,8 @@ def main() -> None:
             "top_k": args.top_k,
             "n_queries": len(per_query),
             "retrieval": retrieval,
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
         }
         with track_run(run_name=f"retrieval-{retrieval}", params=params):
             log_metrics(means)

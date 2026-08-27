@@ -64,3 +64,29 @@ def ndcg_at_k(
     )
     ideal = sum(1.0 / math.log2(index + 2) for index in range(min(len(relevant_set), k)))
     return dcg / ideal if ideal > 0.0 else 0.0
+
+
+def chunk_indices_for_keywords(
+    text: str,
+    keywords: Sequence[str],
+    chunk_size: int,
+    chunk_overlap: int,
+) -> list[int]:
+    """Return the chunk indices of ``text`` that contain any ``keyword``.
+
+    Chunks are produced with the same ``chunk_size``/``chunk_overlap`` used at
+    ingestion, so relevance stays aligned with the indexed collection across
+    chunking configurations (needed for chunk-size ablations). A keyword is a
+    case-insensitive substring of the chunk.
+    """
+    from rag_platform.ingestion.chunker import chunk_text
+
+    if not keywords:
+        return []
+    chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    lowered = [keyword.lower() for keyword in keywords]
+    return [
+        index
+        for index, chunk in enumerate(chunks)
+        if any(keyword in chunk.lower() for keyword in lowered)
+    ]
