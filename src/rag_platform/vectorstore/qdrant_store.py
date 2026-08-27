@@ -178,6 +178,26 @@ class QdrantStore(VectorStore):
             for hit in response.points
         ]
 
+    def search_sparse(
+        self,
+        sparse_vector: Any,
+        top_k: int = 5,
+    ) -> list[SearchHit]:
+        """Retrieve with the sparse vector only (used for fusion sweeps)."""
+        response = self._client.query_points(
+            collection_name=self._collection,
+            query=self._models.SparseVector(
+                indices=sparse_vector.indices, values=sparse_vector.values
+            ),
+            using=_SPARSE_NAME,
+            limit=top_k,
+            with_payload=True,
+        )
+        return [
+            SearchHit(id=str(hit.id), score=float(hit.score), payload=dict(hit.payload or {}))
+            for hit in response.points
+        ]
+
     def delete(self, ids: list[str]) -> None:
         self._client.delete(
             collection_name=self._collection,

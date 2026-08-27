@@ -224,6 +224,20 @@ On the sample corpus the three modes logged to MLflow show **hybrid+rerank
 MRR@5 1.00 / nDCG@5 0.97**, dense 0.94/0.93, and hybrid alone 0.85/0.90 — the
 sparse signal can hurt on a small corpus, but reranking recovers and beats both.
 
+Chunking can also be ablated empirically: `run_ablation` re-ingests the corpus for
+a grid of `chunk_size` × `chunk_overlap`, scores each configuration and logs it to
+MLflow:
+
+```bash
+python -m rag_platform.evaluation.run_ablation \
+    --chunk-sizes 200,300,400,512 --overlaps 32,64,128 --mlflow
+```
+
+On the sample corpus the optimum is **`chunk_size=300, chunk_overlap=64`
+(nDCG@5 0.945)** — better than the default 512/64 (0.898) — while very large
+overlaps hurt. The RRF constant is tunable client-side via `run_rrf_sweep`; on
+this small corpus `k` has no measurable effect.
+
 A recent real run on the sample corpus (3 questions, `top_k 3`, judge `llama3.2:3b`,
 dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relevancy
 0.70**, **context precision 0.92** and **context recall 0.73** on a clean
@@ -235,12 +249,10 @@ Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
 
 ### Retrieval quality
 
-- Ablation of `chunk_size` × `chunk_overlap` logged to MLflow
 - Structure-aware (semantic) chunking
 
 ### Retrieval tuning
 
-- Dense/sparse weight and RRF-`k` sweep
 - Rerank candidate-pool sweep (`RAG_RERANK_TOP_K`)
 - Query expansion / HyDE
 

@@ -71,7 +71,10 @@ backend-agnostic.
 Points carry a named dense vector (`dense`) and, for hybrid backends, an optional
 sparse vector (`sparse`). `supports_hybrid` gates `search_hybrid`, which Qdrant
 implements with native reciprocal rank fusion (prefetch of both vectors +
-`FusionQuery(RRF)`); Milvus stays dense-only and rejects sparse upserts.
+`FusionQuery(RRF)`); Milvus stays dense-only and rejects sparse upserts. A pure,
+tunable client-side RRF (`vectorstore/fusion.py`) plus a sparse-only search
+(`search_sparse`) are also available, since the Qdrant server exposes no knob for
+the RRF constant — used by the fusion sweep.
 
 ### `reranking/`
 
@@ -112,7 +115,12 @@ run parameter so retrieval variants can be compared (A/B) in MLflow.
 `retrieval_metrics.py` provides pure, deterministic chunk-level metrics (`MRR@k`,
 `hit-rate@k`, `nDCG@k`) over ranked lists of `(source, chunk_index)` keys, and
 `run_retrieval_eval` scores the `/v1/search` ranking for a labelled query set,
-allowing the retrieval stage to be tuned independently of the generator.
+allowing the retrieval stage to be tuned independently of the generator. Relevance
+is resolved from per-document keywords against the current chunking config, so the
+same dataset stays valid across chunk-size ablations. `run_ablation` re-ingests
+the corpus over a `chunk_size` × `chunk_overlap` grid and logs each configuration
+to MLflow; `run_rrf_sweep` fuses the dense and sparse rankings client-side with a
+tunable RRF constant and sweeps it.
 
 ### `mlflow_tracking/`
 
