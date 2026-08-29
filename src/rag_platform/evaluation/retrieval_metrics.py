@@ -71,19 +71,20 @@ def chunk_indices_for_keywords(
     keywords: Sequence[str],
     chunk_size: int,
     chunk_overlap: int,
+    mode: str = "window",
 ) -> list[int]:
     """Return the chunk indices of ``text`` that contain any ``keyword``.
 
-    Chunks are produced with the same ``chunk_size``/``chunk_overlap`` used at
-    ingestion, so relevance stays aligned with the indexed collection across
-    chunking configurations (needed for chunk-size ablations). A keyword is a
-    case-insensitive substring of the chunk.
+    Chunks are produced with the same ``chunk_size``/``chunk_overlap``/``mode``
+    used at ingestion, so relevance stays aligned with the indexed collection
+    across chunking configurations (needed for chunk-size and chunk-mode
+    ablations). A keyword is a case-insensitive substring of the chunk.
     """
-    from rag_platform.ingestion.chunker import chunk_text
+    from rag_platform.ingestion.chunker import chunk_document
 
     if not keywords:
         return []
-    chunks = chunk_text(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    chunks = chunk_document(text, chunk_size=chunk_size, chunk_overlap=chunk_overlap, mode=mode)
     lowered = [keyword.lower() for keyword in keywords]
     return [
         index

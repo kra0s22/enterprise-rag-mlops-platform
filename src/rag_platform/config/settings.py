@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # Chunking
     chunk_size: int = 512
     chunk_overlap: int = 64
+    chunk_mode: str = "window"  # "window" (token) or "semantic" (structure-aware)
 
     # Vector store backend: "qdrant" | "milvus"
     vector_store_provider: str = "qdrant"

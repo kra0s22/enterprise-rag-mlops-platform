@@ -59,6 +59,7 @@ def resolve_relevant(
     relevant: list[list[Any]],
     chunk_size: int,
     chunk_overlap: int,
+    mode: str = "window",
 ) -> set[ChunkKey]:
     """Resolve ``[source, keyword]`` relevance pairs to concrete chunk keys.
 
@@ -74,7 +75,7 @@ def resolve_relevant(
             continue
         text = path.read_text(encoding="utf-8")
         for index in chunk_indices_for_keywords(
-            text, [str(keyword)], chunk_size, chunk_overlap
+            text, [str(keyword)], chunk_size, chunk_overlap, mode=mode
         ):
             keys.add((str(source), index))
     return keys
@@ -121,6 +122,12 @@ def main() -> None:
         default=None,
         help="Chunk overlap used at ingestion (for keyword relevance resolution)",
     )
+    parser.add_argument(
+        "--chunk-mode",
+        type=str,
+        default=None,
+        help="Chunking mode (window or semantic) used at ingestion",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -132,6 +139,7 @@ def main() -> None:
     chunk_overlap = (
         args.chunk_overlap if args.chunk_overlap is not None else settings.chunk_overlap
     )
+    chunk_mode = args.chunk_mode if args.chunk_mode else settings.chunk_mode
 
     rows = [
         json.loads(line)
@@ -145,7 +153,7 @@ def main() -> None:
             args.api_url, row["query"], args.top_k, args.hybrid, args.rerank
         )
         relevant = resolve_relevant(
-            row.get("relevant", []), chunk_size, chunk_overlap
+            row.get("relevant", []), chunk_size, chunk_overlap, mode=chunk_mode
         )
         scores = score_query(relevant, ranked, args.top_k)
         per_query.append({"query": row["query"], "scores": scores})
@@ -176,6 +184,7 @@ def main() -> None:
             "retrieval": retrieval,
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
+            "chunk_mode": chunk_mode,
         }
         with track_run(run_name=f"retrieval-{retrieval}", params=params):
             log_metrics(means)

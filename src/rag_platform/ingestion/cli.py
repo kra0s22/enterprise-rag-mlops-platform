@@ -16,7 +16,7 @@ from typing import Any
 from rag_platform.config.settings import get_settings
 from rag_platform.embeddings.provider import build_embedding_provider
 from rag_platform.embeddings.sparse import HashingSparseEncoder
-from rag_platform.ingestion.chunker import chunk_text
+from rag_platform.ingestion.chunker import chunk_document
 from rag_platform.ingestion.loader import DocumentLoadError, load_document
 from rag_platform.utils.ids import make_chunk_id
 from rag_platform.utils.logging import configure_logging, get_logger
@@ -98,6 +98,7 @@ def _distributed_chunks(
     documents: Sequence[dict[str, Any]],
     chunk_size: int,
     chunk_overlap: int,
+    mode: str = "window",
     spark: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Chunk documents in parallel with PySpark and collect the chunk rows.
@@ -111,7 +112,7 @@ def _distributed_chunks(
 
     session = spark or SparkSession.builder.master("local[*]").appName("rag-ingest").getOrCreate()
     docs_df = session.createDataFrame(list(documents))
-    chunk_df = chunk_documents_spark(session, docs_df, chunk_size, chunk_overlap)
+    chunk_df = chunk_documents_spark(session, docs_df, chunk_size, chunk_overlap, mode=mode)
     return [
         {
             "document_id": row.document_id,
@@ -147,7 +148,9 @@ def main() -> None:
         return
 
     if args.distributed:
-        chunks = _distributed_chunks(documents, settings.chunk_size, settings.chunk_overlap)
+        chunks = _distributed_chunks(
+            documents, settings.chunk_size, settings.chunk_overlap, mode=settings.chunk_mode
+        )
         total = ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
         logger.info("Distributed ingestion finished: %d chunks upserted", total)
         return
@@ -162,7 +165,12 @@ def main() -> None:
                 "metadata": dict(doc["metadata"]),
             }
             for index, chunk in enumerate(
-                chunk_text(doc["text"], settings.chunk_size, settings.chunk_overlap)
+                chunk_document(
+                    doc["text"],
+                    settings.chunk_size,
+                    settings.chunk_overlap,
+                    mode=settings.chunk_mode,
+                )
             )
         ]
         if chunks:

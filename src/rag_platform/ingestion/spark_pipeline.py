@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from rag_platform.ingestion.chunker import chunk_text
+from rag_platform.ingestion.chunker import chunk_document
 
 _CHUNK_SCHEMA = (
     "document_id STRING, chunk_index INT, chunk_text STRING, "
@@ -23,15 +23,24 @@ def _chunk_row(
     chunk_size: int,
     chunk_overlap: int,
     metadata: dict[str, Any] | None,
+    mode: str = "window",
 ) -> list[tuple[str, int, str, dict[str, str]]]:
     coerced = {str(k): str(v) for k, v in (metadata or {}).items()}
     return [
         (document_id, idx, chunk, dict(coerced))
-        for idx, chunk in enumerate(chunk_text(text, chunk_size, chunk_overlap))
+        for idx, chunk in enumerate(
+            chunk_document(text, chunk_size, chunk_overlap, mode=mode)
+        )
     ]
 
 
-def chunk_documents_spark(spark: Any, df: Any, chunk_size: int, chunk_overlap: int) -> Any:
+def chunk_documents_spark(
+    spark: Any,
+    df: Any,
+    chunk_size: int,
+    chunk_overlap: int,
+    mode: str = "window",
+) -> Any:
     """Expand a DataFrame of documents into chunk rows via a PySpark UDF.
 
     The input DataFrame must contain columns ``document_id`` (str), ``text`` (str) and
@@ -43,6 +52,7 @@ def chunk_documents_spark(spark: Any, df: Any, chunk_size: int, chunk_overlap: i
         df: Input documents DataFrame.
         chunk_size: Maximum number of tokens per chunk.
         chunk_overlap: Number of tokens shared between consecutive chunks.
+        mode: Chunking mode, ``window`` or ``semantic``.
 
     Returns:
         A PySpark DataFrame of chunk rows.
@@ -68,7 +78,7 @@ def chunk_documents_spark(spark: Any, df: Any, chunk_size: int, chunk_overlap: i
 
     chunk_udf = F.udf(
         lambda document_id, text, metadata: _chunk_row(
-            document_id, text, int(chunk_size), int(chunk_overlap), metadata
+            document_id, text, int(chunk_size), int(chunk_overlap), metadata, mode
         ),
         ArrayType(chunk_row_schema),
     )

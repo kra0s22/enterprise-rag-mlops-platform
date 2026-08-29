@@ -126,8 +126,11 @@ def test_distributed_chunks_collects_spark_rows(monkeypatch) -> None:
         SimpleNamespace(document_id="d1", chunk_index=1, chunk_text="c1", metadata={"source": "s"}),
     ]
 
-    def fake_chunk(spark, df, chunk_size: int, chunk_overlap: int) -> _FakeChunkDF:
+    def fake_chunk(
+        spark, df, chunk_size: int, chunk_overlap: int, mode: str = "window"
+    ) -> _FakeChunkDF:
         assert chunk_size == 512 and chunk_overlap == 64
+        assert mode == "window"
         return _FakeChunkDF(rows)
 
     monkeypatch.setattr(spark_pipeline, "chunk_documents_spark", fake_chunk)

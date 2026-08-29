@@ -40,11 +40,13 @@ so the whole process shares one configuration object.
 ### `ingestion/`
 
 - **`loader.py`** — loads `.txt`, `.md`, and `.pdf` documents into raw text.
-- **`chunker.py`** — pure, dependency-light token chunking. A sliding window over
-  whitespace tokens guarantees full coverage and overlapping boundaries, which is the
-  main lever on retrieval recall/precision.
+- **`chunker.py`** — pure, dependency-light chunking with two modes: ``window``
+  (sliding token window, full coverage and overlap) and ``semantic``
+  (structure-aware: keeps markdown sections together, splitting oversized ones
+  with the token window). The mode is selected by ``RAG_CHUNK_MODE``.
 - **`spark_pipeline.py`** — expands a PySpark DataFrame of documents into chunk rows
-  via a picklable UDF, enabling fully distributed chunking of large corpora.
+  via a picklable UDF (honoring the chunking mode), enabling fully distributed
+  chunking of large corpora.
 - **`cli.py`** — `rag-ingest` batch command: loads files, chunks, embeds, and upserts
   into the configured vector store. `--distributed` chunks through `spark_pipeline.py`
   (a local PySpark session) instead of single-process tokenization.
@@ -148,3 +150,7 @@ evaluation experiments.
 - **Measurable retrieval A/B** — the evaluation runner can target dense or
   hybrid+rerank retrieval; on the sample corpus this showed `context_recall`
   improving from 0.83 to 0.97, a quantitative proof of the retrieval stack.
+- **Chunking is measured, not assumed** — chunk size/overlap are ablated
+  empirically, and structure-aware chunking was implemented and measured before
+  adoption: on the sample corpus it ranked below the token-window optimum, so it
+  stays an opt-in mode rather than the default.

@@ -154,6 +154,7 @@ Key variables:
 - `RAG_VECTOR_STORE_PROVIDER` — `qdrant` or `milvus`
 - `RAG_EMBEDDING_MODEL` — local SentenceTransformer model name
 - `RAG_CHUNK_SIZE` / `RAG_CHUNK_OVERLAP` — token chunking window
+- `RAG_CHUNK_MODE` — `window` (token) or `semantic` (structure-aware)
 - `RAG_QDRANT_URL` / `RAG_MILVUS_URI` — vector DB endpoints
 - `RAG_OLLAMA_URL` / `RAG_LLM_MODEL` — local Ollama endpoint and model for generation
 - `RAG_LLM_TEMPERATURE` / `RAG_LLM_MAX_TOKENS` — generation sampling controls
@@ -238,6 +239,11 @@ On the sample corpus the optimum is **`chunk_size=300, chunk_overlap=64`
 overlaps hurt. The RRF constant is tunable client-side via `run_rrf_sweep`; on
 this small corpus `k` has no measurable effect.
 
+A structure-aware chunker is available via `RAG_CHUNK_MODE=semantic`: it groups
+markdown sections instead of fixed token windows. Measured on the same corpus it
+landed **below** the window optimum (nDCG@5 0.75 vs 0.95) — an honest result that
+chunking strategy must be measured, not assumed.
+
 A recent real run on the sample corpus (3 questions, `top_k 3`, judge `llama3.2:3b`,
 dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relevancy
 0.70**, **context precision 0.92** and **context recall 0.73** on a clean
@@ -246,10 +252,6 @@ three-chunk collection, validating the retrieval + generation path end to end.
 ## Roadmap
 
 Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
-
-### Retrieval quality
-
-- Structure-aware (semantic) chunking
 
 ### Retrieval tuning
 
