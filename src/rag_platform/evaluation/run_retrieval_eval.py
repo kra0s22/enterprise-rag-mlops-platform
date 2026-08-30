@@ -39,6 +39,8 @@ def _search(
     top_k: int,
     hybrid: bool,
     rerank: bool,
+    rerank_top_k: int | None = None,
+    hyde: bool = False,
     timeout: float = 120.0,
 ) -> list[ChunkKey]:
     """Query /v1/search and return the ranked chunk keys ``(source, chunk_index)``."""
@@ -47,6 +49,10 @@ def _search(
         payload["hybrid"] = True
     if rerank:
         payload["rerank"] = True
+    if rerank and rerank_top_k:
+        payload["rerank_top_k"] = rerank_top_k
+    if hyde:
+        payload["hyde"] = True
     response = httpx.post(f"{api_url}/v1/search", json=payload, timeout=timeout)
     response.raise_for_status()
     return [
@@ -128,6 +134,15 @@ def main() -> None:
         default=None,
         help="Chunking mode (window or semantic) used at ingestion",
     )
+    parser.add_argument(
+        "--rerank-top-k",
+        type=int,
+        default=None,
+        help="Candidate pool size when reranking (defaults to RAG_RERANK_TOP_K)",
+    )
+    parser.add_argument(
+        "--hyde", action="store_true", help="Expand queries with HyDE (hypothetical passages)"
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -150,7 +165,13 @@ def main() -> None:
     per_query: list[dict[str, Any]] = []
     for row in rows:
         ranked = _search(
-            args.api_url, row["query"], args.top_k, args.hybrid, args.rerank
+            args.api_url,
+            row["query"],
+            args.top_k,
+            args.hybrid,
+            args.rerank,
+            rerank_top_k=args.rerank_top_k,
+            hyde=args.hyde,
         )
         relevant = resolve_relevant(
             row.get("relevant", []), chunk_size, chunk_overlap, mode=chunk_mode
@@ -185,6 +206,8 @@ def main() -> None:
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
             "chunk_mode": chunk_mode,
+            "rerank_top_k": args.rerank_top_k,
+            "hyde": args.hyde,
         }
         with track_run(run_name=f"retrieval-{retrieval}", params=params):
             log_metrics(means)

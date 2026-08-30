@@ -39,7 +39,19 @@ def search(
 ) -> SearchResponse:
     """Embed the query and return the top-k nearest chunks."""
     settings = get_settings()
-    retrieve_k = settings.rerank_top_k if request.rerank else request.top_k
+    retrieve_k = (
+        (request.rerank_top_k or settings.rerank_top_k)
+        if request.rerank
+        else request.top_k
+    )
+    query_vector = embedder.embed_query(request.query)
+    if request.hyde:
+        from rag_platform.generation.client import build_generation_client
+        from rag_platform.generation.hyde import hyde_query_vector
+
+        query_vector = hyde_query_vector(
+            request.query, build_generation_client(settings), embedder
+        )
     if request.hybrid:
         if not store.supports_hybrid:
             raise HTTPException(
@@ -47,13 +59,12 @@ def search(
                 detail="Hybrid search is not supported by the configured vector store",
             )
         hits = store.search_hybrid(
-            embedder.embed_query(request.query),
+            query_vector,
             sparse_encoder.encode(request.query),
             top_k=retrieve_k,
             filters=request.filters,
         )
     else:
-        query_vector = embedder.embed_query(request.query)
         hits = store.search(query_vector, top_k=retrieve_k, filters=request.filters)
     if request.rerank:
         hits = rerank_hits(hits, request.query, reranker, request.top_k)

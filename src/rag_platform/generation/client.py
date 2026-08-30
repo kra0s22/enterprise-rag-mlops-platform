@@ -20,6 +20,13 @@ _SYSTEM_PROMPT = (
     "Do not invent facts."
 )
 
+_HYPOTHESIS_SYSTEM = "You are a technical writer for a documentation knowledge base."
+_HYPOTHESIS_PROMPT = (
+    "Write a short factual passage that would answer the following question. "
+    "Keep it specific and grounded in likely documentation content.\n\n"
+    "Question: {query}\n\nPassage:"
+)
+
 
 def build_grounded_prompt(query: str, contexts: list[str]) -> str:
     """Assemble the user prompt with the retrieved chunks as grounding context."""
@@ -61,6 +68,26 @@ class OllamaClient:
         logger.info(
             "Generating answer for query=%r with %d context chunks", query, len(contexts)
         )
+        response = httpx.post(
+            f"{self._base_url}/api/generate", json=payload, timeout=120
+        )
+        response.raise_for_status()
+        return response.json()["response"]
+
+    def generate_hypothesis(self, query: str) -> str:
+        """Return a hypothetical passage that would answer ``query`` (HyDE).
+
+        Used by query expansion: the passage is embedded and used for retrieval
+        instead of the raw query, which can surface chunks the query itself
+        would not match.
+        """
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "prompt": _HYPOTHESIS_PROMPT.format(query=query),
+            "system": _HYPOTHESIS_SYSTEM,
+            "stream": False,
+            "options": {"temperature": 0.4, "num_predict": 256},
+        }
         response = httpx.post(
             f"{self._base_url}/api/generate", json=payload, timeout=120
         )

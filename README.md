@@ -174,7 +174,18 @@ documents are indexed with both representations automatically during ingestion.
 Sending `"rerank": true` on `/v1/search` or `/v1/rag` retrieves a wider candidate
 set (`RAG_RERANK_TOP_K`, default 10) and re-scores it with a cross-encoder
 (`cross-encoder/ms-marco-MiniLM-L-6-v2`) before returning the final `top_k`,
-lifting precision over the raw bi-encoder ranking.
+lifting precision over the raw bi-encoder ranking. The pool can also be set per
+request with `"rerank_top_k": N`; a sweep on the sample corpus found
+`rerank_top_k=10` is the sweet spot (nDCG@5 0.988) — a pool of 5 loses recall
+(0.967) while pools ≥10 return identical results.
+
+## Query expansion (HyDE)
+
+`"hyde": true` on `/v1/search` or `/v1/rag` generates a hypothetical passage for
+the query with the local LLM and embeds that for retrieval instead of the raw
+query. Measured on the sample corpus it did **not** improve over dense retrieval
+(nDCG@5 0.93 vs 0.95): the small local model adds noise when queries are already
+specific, so the flag stays opt-in.
 
 ## Evaluation
 
@@ -252,11 +263,6 @@ three-chunk collection, validating the retrieval + generation path end to end.
 ## Roadmap
 
 Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
-
-### Retrieval tuning
-
-- Rerank candidate-pool sweep (`RAG_RERANK_TOP_K`)
-- Query expansion / HyDE
 
 ### Production hardening
 

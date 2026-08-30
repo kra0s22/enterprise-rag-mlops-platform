@@ -89,6 +89,8 @@ trim to `top_k` when `rerank` is enabled.
 
 `OllamaClient` builds a strict "answer only from context" prompt and calls a local
 Ollama model, returning the grounded answer together with its retrieved sources.
+It also provides `generate_hypothesis` for HyDE query expansion, and `hyde.py`
+embeds the hypothetical passage for retrieval.
 
 ### `api/`
 
@@ -99,9 +101,11 @@ FastAPI application with:
 - `POST /v1/rag` — retrieve context and generate a grounded answer with Ollama.
 - `GET /health` — liveness probe.
 
-Requests accept `hybrid` (dense+sparse RRF) and `rerank` (cross-encoder) flags.
-Dependencies (`get_embedder`, `get_vector_store`, `get_sparse_encoder`,
-`get_reranker`) are singletons, created once per process and overridable in tests.
+Requests accept `hybrid` (dense+sparse RRF), `rerank` (cross-encoder) with an
+optional per-request `rerank_top_k` pool, and `hyde` (LLM-generated hypothetical
+query embedding) flags. Dependencies (`get_embedder`, `get_vector_store`,
+`get_sparse_encoder`, `get_reranker`) are singletons, created once per process and
+overridable in tests.
 
 ### `evaluation/`
 
@@ -154,3 +158,7 @@ evaluation experiments.
   empirically, and structure-aware chunking was implemented and measured before
   adoption: on the sample corpus it ranked below the token-window optimum, so it
   stays an opt-in mode rather than the default.
+- **Retrieval tuning is measured, not assumed** — the rerank candidate pool and
+  HyDE query expansion were implemented and swept/measured: the default pool of
+  10 was confirmed optimal, and HyDE did not beat dense retrieval on the small
+  corpus, so both remain opt-in rather than defaults.

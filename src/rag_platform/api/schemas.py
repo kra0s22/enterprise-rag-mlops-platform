@@ -35,6 +35,15 @@ class SearchRequest(BaseModel):
     rerank: bool = Field(
         default=False, description="Rerank candidates with a cross-encoder"
     )
+    rerank_top_k: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Candidate pool for reranking; defaults to RAG_RERANK_TOP_K",
+    )
+    hyde: bool = Field(
+        default=False, description="Expand the query with a hypothetical passage (HyDE)"
+    )
 
 
 class SearchHitResponse(BaseModel):
@@ -64,6 +73,15 @@ class RagRequest(BaseModel):
     hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
     rerank: bool = Field(
         default=False, description="Rerank context candidates with a cross-encoder"
+    )
+    rerank_top_k: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Candidate pool for reranking; defaults to RAG_RERANK_TOP_K",
+    )
+    hyde: bool = Field(
+        default=False, description="Expand the query with a hypothetical passage (HyDE)"
     )
 
 
