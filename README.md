@@ -33,7 +33,7 @@ portfolio showcase targeting European tech companies.
 │   ├── reranking/               # Cross-encoder reranking
 │   ├── vectorstore/             # VectorStore abstraction + Qdrant/Milvus backends
 │   ├── api/                     # FastAPI app (schemas, routes, dependencies)
-│   ├── observability/           # Prometheus-style metrics collector
+│   ├── observability/           # Prometheus metrics + drift monitoring
 │   ├── evaluation/              # Ragas evaluation runner
 │   └── mlflow_tracking/         # MLflow experiment tracking
 ├── tests/                       # pytest suites (unit, API, opt-in integration)
@@ -220,8 +220,32 @@ The dataset is a JSONL file with `{question, ground_truth}`; the runner writes t
 answers and retrieved contexts to `data/eval_results.jsonl` for reproducibility.
 
 An on-demand CI job (`real-evaluation`) runs the same evaluation on every manual
-dispatch when an `OPENAI_API_KEY` secret is configured, so model quality can be
-tracked over time without a local LLM.
+`workflow_dispatch` when an `OPENAI_API_KEY` secret is configured, so model
+quality can be tracked over time without a local LLM. Add the key under
+**Repository → Settings → Secrets and variables → Actions**; the job skips
+cleanly when the secret is absent.
+
+## Knowledge-base drift monitoring
+
+Retrieval quality depends on the corpus staying coherent: adding, removing or
+rewriting documents shifts the embedding distribution and can silently change
+which chunks are retrieved. `run_drift_monitor` snapshots the whole collection
+and compares it against a stored baseline:
+
+```bash
+# Record the reference snapshot after (re)ingesting the corpus.
+python -m rag_platform.observability.run_drift_monitor --baseline
+
+# Periodically compare the live collection against the baseline (e.g. cron).
+python -m rag_platform.observability.run_drift_monitor
+```
+
+The report shows chunk count, centroid cosine shift, count delta and source
+churn; it exits `1` when drift exceeds the configured thresholds
+(`centroid_drift > 0.05` or relative count change `> 20%`) so a scheduler can
+alert. Healthy small changes, such as adding a single document, stay below the
+thresholds and do not fire. Append `--mlflow` to log each snapshot and its
+metrics to MLflow.
 
 ### Chunk-level retrieval metrics
 
@@ -278,20 +302,11 @@ extra dependencies.
 
 Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
 
-### Production hardening
-
-- Knowledge-base freshness and drift monitoring
-
 ### Scale & architecture
 
 - Streaming ingestion (Spark structured streaming)
 - Multi-tenancy (per-tenant partition isolation)
 - Hybrid retrieval validation on Milvus (currently Qdrant-only)
-
-### Ops
-
-- Harden the serving base image (CVE pinning)
-- Wire `OPENAI_API_KEY` secret for the on-demand `real-evaluation` CI job
 
 ## License
 

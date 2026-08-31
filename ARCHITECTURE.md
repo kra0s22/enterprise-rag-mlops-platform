@@ -172,3 +172,11 @@ evaluation experiments.
   and a Prometheus-style metrics endpoint are implemented with the standard
   library (no extra deps), keeping the serving image lean while still exposing
   the production surfaces an operator expects.
+- **Threshold-based drift monitoring** — the corpus is snapshotted as an
+  embedding centroid plus count and source metadata, and compared against a
+  stored baseline. Thresholds avoid false alarms on healthy growth (a single
+  added document stays below them), and the whole collection is read through a
+  backend-agnostic `iter_points`, so drift works against any store.
+- **Reproducible, CVE-hardened images** — the serving base image is pinned to a
+  digest, so upstream changes cannot silently pull new CVEs into the image;
+  updating the base is an explicit, reviewed change.
