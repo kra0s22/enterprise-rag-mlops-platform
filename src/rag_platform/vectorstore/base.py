@@ -79,6 +79,16 @@ class VectorStore(ABC):
     def count(self) -> int:
         """Return the number of stored vectors."""
 
+    def iter_points(self) -> list[tuple[str, np.ndarray, dict[str, Any]]]:
+        """Return ``(id, dense_vector, payload)`` for every stored point.
+
+        Used by offline batch jobs such as drift monitoring. Backends that cannot
+        list the whole collection raise ``NotImplementedError``.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support iterating over all points"
+        )
+
     def healthcheck(self) -> bool:
         """Lightweight liveness probe; subclasses may override."""
         try:

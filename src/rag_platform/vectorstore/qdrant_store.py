@@ -206,3 +206,35 @@ class QdrantStore(VectorStore):
 
     def count(self) -> int:
         return int(self._client.count(collection_name=self._collection).count)
+
+    def iter_points(self) -> list[tuple[str, np.ndarray, dict[str, Any]]]:
+        """Scroll the whole collection and return ``(id, dense, payload)``.
+
+        Drift monitoring snapshots the embedding distribution of the corpus, so it
+        needs to read every stored point rather than only query results.
+        """
+        records: list[tuple[str, np.ndarray, dict[str, Any]]] = []
+        offset: Any = None
+        while True:
+            points, next_offset = self._client.scroll(
+                collection_name=self._collection,
+                limit=256,
+                offset=offset,
+                with_vectors=True,
+            )
+            for point in points:
+                dense = (
+                    point.vector.get(_DENSE_NAME)
+                    if isinstance(point.vector, dict)
+                    else point.vector
+                )
+                records.append(
+                    (
+                        str(point.id),
+                        np.asarray(dense, dtype=np.float32),
+                        dict(point.payload or {}),
+                    )
+                )
+            if next_offset is None:
+                return records
+            offset = next_offset

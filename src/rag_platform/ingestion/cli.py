@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,7 @@ def ingest_chunks(
             "chunk_text": chunk["chunk_text"],
             "document_id": chunk["document_id"],
             "chunk_index": chunk["chunk_index"],
+            "ingested_at": datetime.now(timezone.utc).isoformat(),
             **chunk["metadata"],
         }
         for chunk in chunks
