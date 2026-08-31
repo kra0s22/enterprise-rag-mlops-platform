@@ -1,5 +1,7 @@
 # Serving + ingestion image: core deps only (evaluation stack is optional).
-FROM python:3.11-slim AS base
+# The base image is pinned to a digest so upstream changes cannot silently pull
+# in new CVEs; bump the pin explicitly and rebuild to update the base.
+FROM python:3.11-slim@sha256:1042b61448fef4ba92d16a8c7eb4996d027568ce64792a7877fd88511e0af7c6 AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
