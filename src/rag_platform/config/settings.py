@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    # Security / observability
+    api_key: str | None = None  # when set, require the X-API-Key header on /v1/*
+    rate_limit_per_minute: int = 60  # per-client requests allowed each minute
 
 
 @lru_cache

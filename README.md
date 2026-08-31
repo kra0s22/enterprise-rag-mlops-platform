@@ -33,6 +33,7 @@ portfolio showcase targeting European tech companies.
 │   ├── reranking/               # Cross-encoder reranking
 │   ├── vectorstore/             # VectorStore abstraction + Qdrant/Milvus backends
 │   ├── api/                     # FastAPI app (schemas, routes, dependencies)
+│   ├── observability/           # Prometheus-style metrics collector
 │   ├── evaluation/              # Ragas evaluation runner
 │   └── mlflow_tracking/         # MLflow experiment tracking
 ├── tests/                       # pytest suites (unit, API, opt-in integration)
@@ -125,6 +126,7 @@ python -m pytest tests/test_integration.py -v
 | `POST` | `/v1/search` | Retrieve the top-k nearest chunks for a query               |
 | `POST` | `/v1/rag`    | Retrieve context and generate a grounded answer with Ollama |
 | `GET`  | `/health`    | Liveness probe                                              |
+| `GET`  | `/metrics`   | Prometheus metrics (requests, latency histogram)            |
 
 ### Grounded generation — `POST /v1/rag`
 
@@ -161,6 +163,8 @@ Key variables:
 - `RAG_SPARSE_DIM` — hashed sparse vector dimension used by hybrid retrieval
 - `RAG_RERANKER_MODEL` / `RAG_RERANK_TOP_K` — cross-encoder model and candidate count for reranking
 - `RAG_MLFLOW_TRACKING_URI` — MLflow server endpoint
+- `RAG_API_KEY` — when set, `/v1/*` requires the `X-API-Key` header
+- `RAG_RATE_LIMIT_PER_MINUTE` — per-client requests allowed each minute
 
 ## Hybrid search
 
@@ -260,14 +264,22 @@ dense retrieval) logged to MLflow produced **faithfulness 1.00**, **answer relev
 0.70**, **context precision 0.92** and **context recall 0.73** on a clean
 three-chunk collection, validating the retrieval + generation path end to end.
 
+## Security & observability
+
+When `RAG_API_KEY` is set, every `/v1/*` endpoint requires an `X-API-Key` header
+(401 otherwise); `/health` and `/metrics` stay open. A per-client sliding-window
+rate limiter caps requests at `RAG_RATE_LIMIT_PER_MINUTE` per minute (429 when
+exceeded). A request middleware logs method/path/status/latency and feeds a
+Prometheus-style collector exposed at `GET /metrics` — request counts by
+method/route/status and a latency histogram, in Prometheus text format, with no
+extra dependencies.
+
 ## Roadmap
 
 Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
 
 ### Production hardening
 
-- API authentication and rate limiting
-- Observability (OpenTelemetry, latency histograms)
 - Knowledge-base freshness and drift monitoring
 
 ### Scale & architecture

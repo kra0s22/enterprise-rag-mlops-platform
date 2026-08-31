@@ -107,6 +107,12 @@ query embedding) flags. Dependencies (`get_embedder`, `get_vector_store`,
 `get_sparse_encoder`, `get_reranker`) are singletons, created once per process and
 overridable in tests.
 
+Security and observability are layered on in `main.py`: an opt-in `X-API-Key`
+dependency (`RAG_API_KEY`) guards `/v1/*`, a per-client sliding-window rate
+limiter caps traffic (`RAG_RATE_LIMIT_PER_MINUTE`), and a request middleware logs
+latency and feeds a dependency-free Prometheus-style collector
+(`observability/metrics.py`) exposed at `GET /metrics`.
+
 ### `evaluation/`
 
 `evaluate_rag` runs Ragas metrics (`faithfulness`, `answer_relevancy`,
@@ -162,3 +168,7 @@ evaluation experiments.
   HyDE query expansion were implemented and swept/measured: the default pool of
   10 was confirmed optimal, and HyDE did not beat dense retrieval on the small
   corpus, so both remain opt-in rather than defaults.
+- **Dependency-free security and observability** — API-key auth, rate limiting
+  and a Prometheus-style metrics endpoint are implemented with the standard
+  library (no extra deps), keeping the serving image lean while still exposing
+  the production surfaces an operator expects.
