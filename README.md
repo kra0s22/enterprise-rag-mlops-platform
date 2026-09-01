@@ -27,7 +27,7 @@ portfolio showcase targeting European tech companies.
 ├── src/rag_platform/
 │   ├── config/                  # Pydantic-settings configuration
 │   ├── utils/                   # Logging helpers
-│   ├── ingestion/               # Loader, token chunker, PySpark pipeline, CLI
+│   ├── ingestion/               # Loader, token chunker, PySpark pipeline, streaming, CLI
 │   ├── embeddings/              # Dense provider + hashing sparse encoder
 │   ├── generation/              # Ollama grounded-generation client
 │   ├── reranking/               # Cross-encoder reranking
@@ -84,6 +84,10 @@ repository** at `.conda/` (gitignored). Dev tools and the console scripts
 
 # Distributed chunking with PySpark (requires a JDK reachable via JAVA_HOME)
 .conda\python.exe -m rag_platform.ingestion.cli --distributed ./data/sample
+
+# Stream-ingest new documents as they land in a watched directory (Spark
+# Structured Streaming; requires a JDK; runs until interrupted)
+.conda\python.exe -m rag_platform.ingestion.cli --stream --watch ./data/inbox --checkpoint ./.checkpoint
 
 # Start / stop the vector DB (Docker)
 docker compose -f docker/docker-compose.yml up -d qdrant
@@ -247,6 +251,23 @@ alert. Healthy small changes, such as adding a single document, stay below the
 thresholds and do not fire. Append `--mlflow` to log each snapshot and its
 metrics to MLflow.
 
+## Streaming ingestion
+
+Beyond the batch path, `rag-ingest` can run as a continuous ingestion pipeline
+with Spark Structured Streaming. It watches a directory and indexes every new
+file as it lands, so a knowledge base can grow without manual re-ingestion:
+
+```bash
+python -m rag_platform.ingestion.cli --stream --watch ./data/inbox --checkpoint ./.checkpoint
+```
+
+New files are discovered through the `binaryFile` source, chunked with the same
+distributed UDF as the batch path, and embedded + upserted from the driver via
+`foreachBatch` (Spark has no native vector-DB sink). The `--checkpoint` location
+persists offsets and state, so a restart resumes without re-processing files that
+were already indexed. `--trigger` controls the polling interval in seconds
+(default 10).
+
 ### Chunk-level retrieval metrics
 
 The retrieval stage is also evaluated in isolation, without any LLM, so a gain can
@@ -304,7 +325,6 @@ Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
 
 ### Scale & architecture
 
-- Streaming ingestion (Spark structured streaming)
 - Multi-tenancy (per-tenant partition isolation)
 - Hybrid retrieval validation on Milvus (currently Qdrant-only)
 

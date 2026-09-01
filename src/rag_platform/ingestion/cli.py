@@ -126,15 +126,77 @@ def _distributed_chunks(
     ]
 
 
+def _run_streaming(
+    embedder: Any,
+    store: VectorStore,
+    sparse_encoder: HashingSparseEncoder,
+    settings: Any,
+    args: Any,
+) -> None:
+    """Run continuous ingestion of new files from ``args.watch`` (blocking)."""
+    from pyspark.sql import SparkSession
+
+    from rag_platform.ingestion.streaming import (
+        make_batch_processor,
+        run_streaming_ingestion,
+    )
+
+    session = SparkSession.builder.master("local[*]").appName("rag-ingest-stream").getOrCreate()
+    processor = make_batch_processor(
+        embedder,
+        store,
+        sparse_encoder,
+        settings.chunk_size,
+        settings.chunk_overlap,
+        mode=settings.chunk_mode,
+    )
+    run_streaming_ingestion(
+        session,
+        str(args.watch),
+        str(args.checkpoint),
+        processor,
+        trigger_ms=args.trigger * 1000,
+    )
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Batch-ingest documents into the vector store.")
-    parser.add_argument("paths", nargs="+", type=Path, help="Document files or directories")
+    parser = argparse.ArgumentParser(
+        description="Batch- or stream-ingest documents into the vector store."
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        help="Document files or directories (batch mode)",
+    )
     parser.add_argument(
         "--distributed",
         action="store_true",
         help="Chunk documents with a local PySpark session instead of single-process chunking",
     )
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Run streaming ingestion: watch a directory for new documents",
+    )
+    parser.add_argument("--watch", type=Path, help="Directory to watch (streaming mode)")
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="Spark checkpoint location for fault tolerance (streaming mode)",
+    )
+    parser.add_argument(
+        "--trigger",
+        type=int,
+        default=10,
+        help="Streaming trigger interval in seconds (default: 10)",
+    )
     args = parser.parse_args()
+
+    if args.stream and (args.watch is None or args.checkpoint is None):
+        parser.error("--stream requires both --watch and --checkpoint")
+    if not args.stream and not args.paths:
+        parser.error("provide document paths, or use --stream --watch <dir> --checkpoint <dir>")
 
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -143,6 +205,10 @@ def main() -> None:
     store = build_vector_store(settings, embedder.dimension)
     store.create_collection()
     sparse_encoder = HashingSparseEncoder(n_features=settings.sparse_dim)
+
+    if args.stream:
+        _run_streaming(embedder, store, sparse_encoder, settings, args)
+        return
 
     documents = load_documents(args.paths)
     if not documents:

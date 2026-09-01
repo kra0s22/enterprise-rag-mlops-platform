@@ -47,9 +47,15 @@ so the whole process shares one configuration object.
 - **`spark_pipeline.py`** — expands a PySpark DataFrame of documents into chunk rows
   via a picklable UDF (honoring the chunking mode), enabling fully distributed
   chunking of large corpora.
-- **`cli.py`** — `rag-ingest` batch command: loads files, chunks, embeds, and upserts
-  into the configured vector store. `--distributed` chunks through `spark_pipeline.py`
-  (a local PySpark session) instead of single-process tokenization.
+- **`streaming.py`** — Spark Structured Streaming ingestion: the `binaryFile`
+  source emits every new file in a watched directory as a micro-batch, chunks are
+  produced with the same distributed UDF, and `foreachBatch` embeds + upserts them
+  to the vector store from the driver. Checkpoints make restarts idempotent.
+- **`cli.py`** — `rag-ingest` command: loads files, chunks, embeds, and upserts
+  into the configured vector store. `--distributed` chunks through
+  `spark_pipeline.py` (a local PySpark session) instead of single-process
+  tokenization, and `--stream --watch <dir> --checkpoint <dir>` runs the
+  continuous streaming pipeline.
 
 ### `embeddings/`
 
@@ -180,3 +186,7 @@ evaluation experiments.
 - **Reproducible, CVE-hardened images** — the serving base image is pinned to a
   digest, so upstream changes cannot silently pull new CVEs into the image;
   updating the base is an explicit, reviewed change.
+- **Continuous ingestion via structured streaming** — a watched directory is
+  turned into a fault-tolerant stream with Spark Structured Streaming; `foreachBatch`
+  reuses the exact batch embed+upsert path, so streaming and batch produce
+  identical payloads and there is no second ingestion code path to maintain.
