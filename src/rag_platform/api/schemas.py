@@ -15,6 +15,10 @@ class IngestRequest(BaseModel):
     metadata: dict[str, Any] = Field(
         default_factory=dict, description="Arbitrary document metadata"
     )
+    tenant_id: str | None = Field(
+        default=None,
+        description="Tenant the chunks belong to; defaults to RAG_TENANT",
+    )
 
 
 class IngestResponse(BaseModel):
@@ -31,6 +35,10 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Natural-language query")
     top_k: int = Field(default=5, ge=1, le=100, description="Number of hits to return")
     filters: dict[str, Any] = Field(default_factory=dict, description="Exact-match payload filters")
+    tenant_id: str | None = Field(
+        default=None,
+        description="Scope retrieval to a tenant; defaults to RAG_TENANT",
+    )
     hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
     rerank: bool = Field(
         default=False, description="Rerank candidates with a cross-encoder"
@@ -69,6 +77,10 @@ class RagRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20, description="Number of context chunks to retrieve")
     filters: dict[str, Any] = Field(
         default_factory=dict, description="Exact-match payload filters"
+    )
+    tenant_id: str | None = Field(
+        default=None,
+        description="Scope retrieval to a tenant; defaults to RAG_TENANT",
     )
     hybrid: bool = Field(default=False, description="Use hybrid dense+sparse retrieval")
     rerank: bool = Field(

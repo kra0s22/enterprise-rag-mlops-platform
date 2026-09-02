@@ -64,6 +64,13 @@ class QdrantStore(VectorStore):
                 _SPARSE_NAME: self._models.SparseVectorParams(),
             },
         )
+        # Every chunk carries tenant_id (multi-tenancy); an index on the field
+        # keeps tenant-scoped filtered searches fast on a shared collection.
+        self._client.create_payload_index(
+            collection_name=self._collection,
+            field_name="tenant_id",
+            field_schema=self._models.PayloadSchemaType.KEYWORD,
+        )
         logger.info(
             "Created Qdrant collection '%s' (dense=%s, sparse=%s)",
             self._collection,

@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     default_top_k: int = 5
     score_threshold: float = 0.0
 
+    # Multi-tenancy: every chunk is tagged with a tenant_id; retrieval is scoped
+    # to a tenant so corpora stay isolated on a shared collection.
+    tenant: str = "default"
+
     # Generation (Ollama)
     ollama_url: str = "http://localhost:11434"
     llm_model: str = "llama3.2:3b"

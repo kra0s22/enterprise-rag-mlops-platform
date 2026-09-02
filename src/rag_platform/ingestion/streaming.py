@@ -108,6 +108,7 @@ def process_batch(
     chunk_size: int,
     chunk_overlap: int,
     mode: str = "window",
+    tenant_id: str | None = None,
 ) -> int:
     """Ingest one micro-batch of documents; returns the number of chunks stored.
 
@@ -122,7 +123,9 @@ def process_batch(
     chunks = _chunk_documents(
         documents, batch_df.sparkSession, chunk_size, chunk_overlap, mode
     )
-    count = ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
+    count = ingest_chunks(
+        embedder, store, chunks, sparse_encoder=sparse_encoder, tenant_id=tenant_id
+    )
     logger.info(
         "Ingested %d chunks from %d new file(s) in the streaming batch",
         count,
@@ -138,6 +141,7 @@ def make_batch_processor(
     chunk_size: int,
     chunk_overlap: int,
     mode: str = "window",
+    tenant_id: str | None = None,
 ) -> Callable[[Any, int], None]:
     """Return a ``foreachBatch``-compatible callable for a streaming query."""
 
@@ -150,6 +154,7 @@ def make_batch_processor(
             chunk_size,
             chunk_overlap,
             mode=mode,
+            tenant_id=tenant_id,
         )
         logger.debug("Streaming epoch %s processed", epoch_id)
 

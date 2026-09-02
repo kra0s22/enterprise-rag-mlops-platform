@@ -59,7 +59,7 @@ def test_search_hybrid_returns_hits(client, store, embedder) -> None:
     store.upsert(
         [str(uuid.uuid4()), str(uuid.uuid4())],
         embedder.embed_documents(texts),
-        [{"chunk_text": t} for t in texts],
+        [{"chunk_text": t, "tenant_id": "default"} for t in texts],
         sparse_vectors=encoder.encode_batch(texts),
     )
 
@@ -104,7 +104,7 @@ def test_search_rerank_reorders_by_cross_encoder(client, store, embedder) -> Non
     store.upsert(
         [str(uuid.uuid4()), str(uuid.uuid4())],
         embedder.embed_documents(texts),
-        [{"chunk_text": t} for t in texts],
+        [{"chunk_text": t, "tenant_id": "default"} for t in texts],
     )
 
     response = client.post("/v1/search", json={"query": "cat", "top_k": 1, "rerank": True})

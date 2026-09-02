@@ -67,13 +67,15 @@ def ingest_chunks(
     store: VectorStore,
     chunks: Sequence[dict[str, Any]],
     sparse_encoder: HashingSparseEncoder | None = None,
+    tenant_id: str | None = None,
 ) -> int:
     """Embed and upsert chunk rows; returns the number of chunks stored.
 
     Each chunk row carries ``document_id``, ``chunk_index``, ``chunk_text`` and a
     ``metadata`` mapping that is merged into the vector payload. When a
     ``sparse_encoder`` is provided, sparse vectors are stored alongside the dense
-    ones so hybrid retrieval can use the points.
+    ones so hybrid retrieval can use the points. When ``tenant_id`` is given it
+    is stamped onto every payload for multi-tenant isolation.
     """
     if not chunks:
         return 0
@@ -89,6 +91,9 @@ def ingest_chunks(
         }
         for chunk in chunks
     ]
+    if tenant_id is not None:
+        for payload in payloads:
+            payload["tenant_id"] = tenant_id
     sparse_vectors = None
     if sparse_encoder is not None:
         sparse_vectors = sparse_encoder.encode_batch([chunk["chunk_text"] for chunk in chunks])
@@ -149,6 +154,7 @@ def _run_streaming(
         settings.chunk_size,
         settings.chunk_overlap,
         mode=settings.chunk_mode,
+        tenant_id=args.tenant or settings.tenant,
     )
     run_streaming_ingestion(
         session,
@@ -191,6 +197,12 @@ def main() -> None:
         default=10,
         help="Streaming trigger interval in seconds (default: 10)",
     )
+    parser.add_argument(
+        "--tenant",
+        type=str,
+        default=None,
+        help="Tenant to tag the ingested chunks with (default: RAG_TENANT)",
+    )
     args = parser.parse_args()
 
     if args.stream and (args.watch is None or args.checkpoint is None):
@@ -205,6 +217,7 @@ def main() -> None:
     store = build_vector_store(settings, embedder.dimension)
     store.create_collection()
     sparse_encoder = HashingSparseEncoder(n_features=settings.sparse_dim)
+    tenant_id = args.tenant or settings.tenant
 
     if args.stream:
         _run_streaming(embedder, store, sparse_encoder, settings, args)
@@ -219,7 +232,9 @@ def main() -> None:
         chunks = _distributed_chunks(
             documents, settings.chunk_size, settings.chunk_overlap, mode=settings.chunk_mode
         )
-        total = ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
+        total = ingest_chunks(
+            embedder, store, chunks, sparse_encoder=sparse_encoder, tenant_id=tenant_id
+        )
         logger.info("Distributed ingestion finished: %d chunks upserted", total)
         return
 
@@ -242,7 +257,9 @@ def main() -> None:
             )
         ]
         if chunks:
-            total += ingest_chunks(embedder, store, chunks, sparse_encoder=sparse_encoder)
+            total += ingest_chunks(
+                embedder, store, chunks, sparse_encoder=sparse_encoder, tenant_id=tenant_id
+            )
             logger.info("Ingested %s (%d chunks)", doc["metadata"]["source"], len(chunks))
 
     logger.info("Ingestion finished: %d chunks upserted", total)

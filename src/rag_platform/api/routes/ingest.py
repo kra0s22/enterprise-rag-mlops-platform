@@ -40,12 +40,14 @@ def ingest_document(
 
     document_id = request.document_id or uuid.uuid4().hex
     ids = [make_chunk_id(document_id, i) for i in range(len(chunks))]
+    tenant_id = request.tenant_id or settings.tenant
     vectors = embedder.embed_documents(chunks)
     payloads = [
         {
             "chunk_text": chunk,
             "document_id": document_id,
             "chunk_index": i,
+            "tenant_id": tenant_id,
             **request.metadata,
         }
         for i, chunk in enumerate(chunks)

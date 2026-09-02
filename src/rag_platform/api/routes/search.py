@@ -13,6 +13,7 @@ from rag_platform.api.dependencies import (
     get_vector_store,
 )
 from rag_platform.api.schemas import SearchHitResponse, SearchRequest, SearchResponse
+from rag_platform.api.tenancy import scope_filters
 from rag_platform.config.settings import get_settings
 from rag_platform.embeddings.provider import EmbeddingProvider
 from rag_platform.embeddings.sparse import HashingSparseEncoder
@@ -62,10 +63,14 @@ def search(
             query_vector,
             sparse_encoder.encode(request.query),
             top_k=retrieve_k,
-            filters=request.filters,
+            filters=scope_filters(request.filters, request.tenant_id, settings.tenant),
         )
     else:
-        hits = store.search(query_vector, top_k=retrieve_k, filters=request.filters)
+        hits = store.search(
+            query_vector,
+            top_k=retrieve_k,
+            filters=scope_filters(request.filters, request.tenant_id, settings.tenant),
+        )
     if request.rerank:
         hits = rerank_hits(hits, request.query, reranker, request.top_k)
     return SearchResponse(
