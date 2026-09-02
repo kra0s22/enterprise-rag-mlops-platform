@@ -169,13 +169,25 @@ Key variables:
 - `RAG_MLFLOW_TRACKING_URI` — MLflow server endpoint
 - `RAG_API_KEY` — when set, `/v1/*` requires the `X-API-Key` header
 - `RAG_RATE_LIMIT_PER_MINUTE` — per-client requests allowed each minute
+- `RAG_TENANT` — default tenant used to tag ingested chunks and scope retrieval
 
 ## Hybrid search
 
 Retrieval can fuse dense embeddings with hashing-based sparse vectors using
 reciprocal rank fusion (RRF). Send `"hybrid": true` on `/v1/search` or `/v1/rag`;
 documents are indexed with both representations automatically during ingestion.
-`RAG_SPARSE_DIM` controls the sparse index size.
+`RAG_SPARSE_DIM` controls the sparse index size. Hybrid is implemented natively on
+the Qdrant backend and, on Milvus, through its `SPARSE_FLOAT_VECTOR` field fused
+with an `RRFRanker` — both behind the same `VectorStore.search_hybrid` contract.
+
+## Multi-tenancy
+
+Every chunk is tagged with a `tenant_id` at ingestion (`RAG_TENANT`, or the
+`--tenant` CLI flag / `tenant_id` body field on `/v1/ingest`). Retrieval is
+scoped to a tenant: `/v1/search` and `/v1/rag` accept an optional `tenant_id`
+(defaults to `RAG_TENANT`) which is injected into the payload filters, so a
+request can only ever see its own tenant's corpus on a shared collection. Qdrant
+indexes the `tenant_id` payload field so scoped searches stay fast.
 
 ## Reranking
 
@@ -321,12 +333,8 @@ extra dependencies.
 
 ## Roadmap
 
-Prioritised backlog for the retrieval and MLOps layers (effort: S/M/L).
-
-### Scale & architecture
-
-- Multi-tenancy (per-tenant partition isolation)
-- Hybrid retrieval validation on Milvus (currently Qdrant-only)
+All roadmap items are complete (retrieval quality, tuning, hardening,
+observability, scale and ops blocks).
 
 ## License
 

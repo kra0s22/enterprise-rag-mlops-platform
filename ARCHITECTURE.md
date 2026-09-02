@@ -79,10 +79,14 @@ backend-agnostic.
 Points carry a named dense vector (`dense`) and, for hybrid backends, an optional
 sparse vector (`sparse`). `supports_hybrid` gates `search_hybrid`, which Qdrant
 implements with native reciprocal rank fusion (prefetch of both vectors +
-`FusionQuery(RRF)`); Milvus stays dense-only and rejects sparse upserts. A pure,
-tunable client-side RRF (`vectorstore/fusion.py`) plus a sparse-only search
-(`search_sparse`) are also available, since the Qdrant server exposes no knob for
-the RRF constant — used by the fusion sweep.
+`FusionQuery(RRF)`); Milvus stores the sparse representation in a
+`SPARSE_FLOAT_VECTOR` field and fuses dense + sparse with its own `RRFRanker`
+(shared helper `sparse_to_milvus` converts the hashed `SparseVector` into
+Milvus' `{index: value}` dicts). `iter_points` scrolls the whole collection for
+offline jobs (drift monitoring). A pure, tunable client-side RRF
+(`vectorstore/fusion.py`) plus a sparse-only search (`search_sparse`) are also
+available, since the Qdrant server exposes no knob for the RRF constant — used by
+the fusion sweep.
 
 ### `reranking/`
 
@@ -112,6 +116,12 @@ optional per-request `rerank_top_k` pool, and `hyde` (LLM-generated hypothetical
 query embedding) flags. Dependencies (`get_embedder`, `get_vector_store`,
 `get_sparse_encoder`, `get_reranker`) are singletons, created once per process and
 overridable in tests.
+
+Multi-tenancy is enforced at the API layer: `tenant_id` is stamped on every chunk
+at ingestion and injected into the retrieval filters by `scope_filters`
+(`api/tenancy.py`), so search and generation are always scoped to one tenant on a
+shared collection. Qdrant indexes the `tenant_id` payload field for fast scoped
+lookups.
 
 Security and observability are layered on in `main.py`: an opt-in `X-API-Key`
 dependency (`RAG_API_KEY`) guards `/v1/*`, a per-client sliding-window rate
@@ -190,3 +200,11 @@ evaluation experiments.
   turned into a fault-tolerant stream with Spark Structured Streaming; `foreachBatch`
   reuses the exact batch embed+upsert path, so streaming and batch produce
   identical payloads and there is no second ingestion code path to maintain.
+- **Multi-tenancy at the retrieval layer** — chunks are tagged with `tenant_id` and
+  every request is scoped to one tenant via an injected payload filter; isolation
+  lives in the query path (shared collection) rather than duplicating collections
+  per tenant, and the `tenant_id` field is indexed for filtered scans.
+- **Hybrid on every backend** — the sparse representation and `search_hybrid`
+  contract are implemented on both Qdrant (native RRF) and Milvus
+  (`SPARSE_FLOAT_VECTOR` + `RRFRanker`), so the abstraction never leaks backend
+  capability differences into the retrieval code.
